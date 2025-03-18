@@ -10,13 +10,13 @@ const { ethereum } = window;
 const createEthereumContract = async () => {
   try {
     if (!ethereum) return alert("Please install MetaMask!");
-    
-    const provider = new ethers.BrowserProvider(ethereum); 
+
+    const provider = new ethers.BrowserProvider(ethereum);
     const signer = await provider.getSigner();
     const transactionsContract = new ethers.Contract(
       contractAddress,
       contractABI,
-      signer
+      signer,
     );
 
     return transactionsContract;
@@ -27,88 +27,99 @@ const createEthereumContract = async () => {
 };
 
 export const TransactionsProvider = ({ children }) => {
-  const [formData, setformData] = useState({ addressTo: "", amount: "", keyword: "", message: "" });
+  const [formData, setformData] = useState({
+    addressTo: "",
+    amount: "",
+    keyword: "",
+    message: "",
+  });
   const [currentAccount, setCurrentAccount] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [transactionCount, setTransactionCount] = useState(localStorage.getItem("transactionCount"));
+  const [transactionCount, setTransactionCount] = useState(
+    localStorage.getItem("transactionCount"),
+  );
   const [transactions, setTransactions] = useState([]);
 
   const handleChange = (e, name) => {
     setformData((prevState) => ({ ...prevState, [name]: e.target.value }));
   };
 
-const getAllTransactions = async () => {
+  const getAllTransactions = async () => {
     try {
       if (!ethereum) return alert("Please install MetaMask!");
-      
+
       const contract = await createEthereumContract();
       if (!contract) return;
-  
+
       console.log("Fetching transactions from contract...");
-      if (typeof contract.getAllTransactions !== 'function') {
-        console.error("getAllTransactions method doesn't exist on the contract");
+      if (typeof contract.getAllTransactions !== "function") {
+        console.error(
+          "getAllTransactions method doesn't exist on the contract",
+        );
         return;
       }
-      
+
       const availableTransactions = await contract.getAllTransactions();
       console.log("Contract:", contract);
       console.log("Raw transactions:", availableTransactions);
 
- if (!availableTransactions || availableTransactions.length === 0) {
+      if (!availableTransactions || availableTransactions.length === 0) {
         console.log("No transactions returned");
         setTransactions([]);
         return;
       }
       const txArray = Array.from(availableTransactions);
-      
+
       const structuredTransactions = txArray.map((transaction) => ({
         addressTo: transaction.receiver,
         addressFrom: transaction.sender,
-        timestamp: new Date(Number(transaction.timestamp) * 1000).toLocaleString(),
+        timestamp: new Date(
+          Number(transaction.timestamp) * 1000,
+        ).toLocaleString(),
         message: transaction.message,
         keyword: transaction.keyword,
-        amount: ethers.formatEther(transaction.amount)
+        amount: ethers.formatEther(transaction.amount),
       }));
-  
+
       console.log("Structured transactions:", structuredTransactions);
       setTransactions(structuredTransactions);
     } catch (error) {
       console.error("Error getting transactions:", error?.message || error);
-      setTransactions([]); 
+      setTransactions([]);
     }
   };
 
   const checkIfWalletIsConnect = async () => {
     try {
-        if (!ethereum) {
-            console.log("No MetaMask detected");
-            return;
-        }
+      if (!ethereum) {
+        console.log("No MetaMask detected");
+        return;
+      }
 
-        const accounts = await ethereum.request({ method: "eth_accounts" });
-        console.log("Connected accounts:", accounts);
+      const accounts = await ethereum.request({ method: "eth_accounts" });
+      console.log("Connected accounts:", accounts);
 
-        if (accounts.length) {
-            setCurrentAccount(accounts[0]);
-            console.log("Fetching transactions...");
-            await getAllTransactions(); 
-        }
+      if (accounts.length) {
+        setCurrentAccount(accounts[0]);
+        console.log("Fetching transactions...");
+        await getAllTransactions();
+      }
     } catch (error) {
-        console.error("Error checking wallet connection:", error);
+      console.error("Error checking wallet connection:", error);
     }
-};
+  };
 
-const checkIfTransactionsExists = async () => {
+  const checkIfTransactionsExists = async () => {
     try {
       if (!ethereum) return alert("Please install MetaMask!");
-      
+
       const contract = await createEthereumContract();
       if (!contract) return;
-  
+
       console.log("Available contract methods:", Object.keys(contract));
-    
+
       const count = await contract.getAllTransactionCount();
-      
+
       if (count) {
         window.localStorage.setItem("transactionCount", count.toString());
         setTransactionCount(count.toString());
@@ -122,7 +133,9 @@ const checkIfTransactionsExists = async () => {
     try {
       if (!ethereum) return alert("Please install MetaMask.");
 
-      const accounts = await ethereum.request({ method: "eth_requestAccounts", });
+      const accounts = await ethereum.request({
+        method: "eth_requestAccounts",
+      });
 
       setCurrentAccount(accounts[0]);
       window.location.reload();
@@ -133,7 +146,7 @@ const checkIfTransactionsExists = async () => {
     }
   };
 
-const sendTransaction = async () => {
+  const sendTransaction = async () => {
     try {
       if (!ethereum) return alert("Please install MetaMask.");
 
@@ -143,18 +156,20 @@ const sendTransaction = async () => {
       const parsedAmount = ethers.parseEther(amount);
       await ethereum.request({
         method: "eth_sendTransaction",
-        params: [{
-          from: currentAccount,
-          to: addressTo,
-          gas: "0x5208", 
-          value: parsedAmount.toString(), 
-        }],
+        params: [
+          {
+            from: currentAccount,
+            to: addressTo,
+            gas: "0x5208",
+            value: parsedAmount.toString(),
+          },
+        ],
       });
       const transactionHash = await transactionsContract.addToBlockchain(
-        addressTo, 
+        addressTo,
         parsedAmount,
-        message, 
-        keyword
+        message,
+        keyword,
       );
 
       setIsLoading(true);
@@ -162,9 +177,9 @@ const sendTransaction = async () => {
       await transactionHash.wait();
       console.log(`Success - ${transactionHash.hash}`);
       setIsLoading(false);
-      const transactionsCount = await transactionsContract.getTransactionCount();
+      const transactionsCount =
+        await transactionsContract.getTransactionCount();
       setTransactionCount(transactionsCount.toString());
-      
     } catch (error) {
       console.error("Transaction error:", error);
       setIsLoading(false);
@@ -174,21 +189,21 @@ const sendTransaction = async () => {
 
   useEffect(() => {
     const init = async () => {
-        await checkIfWalletIsConnect();
-        await checkIfTransactionsExists();
+      await checkIfWalletIsConnect();
+      await checkIfTransactionsExists();
     };
     init();
-}, []);
+  }, []);
 
-useEffect(() => {
+  useEffect(() => {
     if (currentAccount) {
-        getAllTransactions();
+      getAllTransactions();
     }
-}, [currentAccount, transactionCount]);
+  }, [currentAccount, transactionCount]);
 
-useEffect(() => {
+  useEffect(() => {
     console.log("Transactions updated:", transactions);
-}, [transactions]);
+  }, [transactions]);
 
   return (
     <TransactionContext.Provider

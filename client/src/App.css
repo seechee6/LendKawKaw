@@ -40,3 +40,11 @@
 .read-the-docs {
   color: #888;
 }
+.eth-card {
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
+}
+
+.eth-card > div {
+  transform: translateZ(20px);
+}

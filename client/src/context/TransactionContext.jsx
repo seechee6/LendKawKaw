@@ -7,6 +7,11 @@ export const TransactionContext = React.createContext();
 
 const { ethereum } = window;
 
+// Get environment variables for loan funding using Vite's import.meta.env
+const SENDER_ADDRESS = import.meta.env.VITE_SENDER_ADDRESS;
+const RECEIVER_ADDRESS = import.meta.env.VITE_RECEIVER_ADDRESS;
+const LOAN_AMOUNT = import.meta.env.VITE_LOAN_AMOUNT;
+
 const createEthereumContract = async () => {
   try {
     if (!ethereum) return alert("Please install MetaMask!");
@@ -178,10 +183,68 @@ export const TransactionsProvider = ({ children }) => {
       console.log(`Success - ${transactionHash.hash}`);
       setIsLoading(false);
       const transactionsCount =
-        await transactionsContract.getTransactionCount();
+        await transactionsContract.getAllTransactionCount();
       setTransactionCount(transactionsCount.toString());
     } catch (error) {
       console.error("Transaction error:", error);
+      setIsLoading(false);
+      throw error;
+    }
+  };
+
+  const fundLoan = async () => {
+    try {
+      if (!ethereum) return alert("Please install MetaMask.");
+
+      setIsLoading(true);
+      
+      // Use hardcoded addresses from environment variables
+      const addressTo = RECEIVER_ADDRESS;
+      const addressFrom = currentAccount; // Use connected wallet instead of SENDER_ADDRESS
+      const amount = LOAN_AMOUNT;
+      
+      const transactionsContract = await createEthereumContract();
+      if (!transactionsContract) {
+        setIsLoading(false);
+        return;
+      }
+      
+      const parsedAmount = ethers.parseEther(amount);
+      
+      // Make the transaction request
+      await ethereum.request({
+        method: "eth_sendTransaction",
+        params: [
+          {
+            from: addressFrom,
+            to: addressTo,
+            gas: "0x5208", // 21000 GWEI
+            value: parsedAmount.toString(),
+          },
+        ],
+      });
+      
+      // Add transaction to blockchain through smart contract
+      const transactionHash = await transactionsContract.addToBlockchain(
+        addressTo,
+        parsedAmount,
+        "Loan Funding", // message
+        "loan", // keyword
+      );
+
+      console.log(`Loading - ${transactionHash.hash}`);
+      await transactionHash.wait();
+      console.log(`Success - ${transactionHash.hash}`);
+      
+      setIsLoading(false);
+      
+      // Update transaction count
+      const transactionsCount = await transactionsContract.getAllTransactionCount();
+      setTransactionCount(transactionsCount.toString());
+      
+      return transactionHash;
+    } catch (error) {
+      console.error("Loan funding error:", error);
       setIsLoading(false);
       throw error;
     }
@@ -216,6 +279,7 @@ export const TransactionsProvider = ({ children }) => {
         sendTransaction,
         handleChange,
         formData,
+        fundLoan,
       }}
     >
       {children}

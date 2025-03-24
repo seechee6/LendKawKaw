@@ -11,6 +11,12 @@ module.exports = {
       screens: {
         mf: "990px",
       },
+      colors: {
+        primary: "#04364A",
+        secondary: "#176B87",
+        tertiary: "#176B87",
+        neutral: "#f8f7f3",
+      },
       keyframes: {
         "slide-in": {
           "0%": {
@@ -31,5 +37,20 @@ module.exports = {
   variants: {
     extend: {},
   },
-  plugins: [require("@tailwindcss/forms")],
+  plugins: [
+    require("@tailwindcss/forms"),
+    function({ addUtilities }) {
+      addUtilities({
+        '.scrollbar-hide': {
+          /* Hide scrollbar for Chrome, Safari and Opera */
+          '&::-webkit-scrollbar': {
+            display: 'none'
+          },
+          /* Hide scrollbar for IE, Edge and Firefox */
+          '-ms-overflow-style': 'none',  /* IE and Edge */
+          'scrollbar-width': 'none'  /* Firefox */
+        }
+      })
+    }
+  ],
 };

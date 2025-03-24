@@ -6,7 +6,7 @@ import { Loader } from "./";
 import { TransactionContext } from "../context/TransactionContext";
 import { shortenAddress } from "../utils/shortenAddress";
 import { useCardAnimation } from "../hooks/useCardAnimation";
-
+import { Services, Transactions, Footer } from "./";
 const commonStyles =
   "min-h-[70px] sm:px-0 px-2 sm:min-w-[120px] flex justify-center items-center border-[0.5px] border-gray-400 text-white";
 const Input = ({ placeholder, name, type, value, handleChange }) => (
@@ -36,6 +36,8 @@ const Welcome = () => {
     sendTransaction();
   };
   return (
+    <>
+    
     <div className="flex w-full justify-center items-center">
       <div className="flex mf:flex-row flex-col items-start justify-between md:p-20 py-12 ">
         <div className="flex flex-1 justify-start flex-col mf:mr-10">
@@ -51,7 +53,7 @@ const Welcome = () => {
             <button
               type="button"
               onClick={connectWallet}
-              className="flex flex-row justify-center rounded-full items-center my-5 bg-[#2952e3] p-3 cursor-pointer hover:bg-[#2546bd]"
+              className="flex flex-row justify-center rounded-full items-center my-5 bg-[#22cd5c] p-3 cursor-pointer hover:bg-[#1db34f]"
             >
               <p className="text-white text-base font-semibold">
                 Connect Wallet
@@ -70,7 +72,7 @@ const Welcome = () => {
 
         <div className="flex flex-col flex-1 items-center justify-start w-full mf:mt-0 mt-10">
           <EthCard currentAccount={currentAccount} />
-          <div className="p-5 sm:w-96 w-full flex flex-col justify-start items-center blue-glassmorphism">
+          <div className="p-5 sm:w-96 w-full flex flex-col justify-start items-center green-glassmorphism">
             <Input
               placeholder="Address To"
               name="addressTo"
@@ -112,6 +114,10 @@ const Welcome = () => {
         </div>
       </div>
     </div>
+    <Services></Services>
+      <Transactions></Transactions>
+      <Footer></Footer>
+    </>
   );
 };
 

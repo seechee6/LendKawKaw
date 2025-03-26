@@ -23,3 +23,5 @@ export { default as SelfiePage } from './SelfiePage';
 export { default as UploadPayslipPage } from './UploadPayslipPage';
 export { default as OnboardingSuccessPage } from './OnboardingSuccessPage';
 
+export { default as WithdrawTutorialPage } from './WithdrawTutorialPage';
+

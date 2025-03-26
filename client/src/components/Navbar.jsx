@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { HiMenuAlt4 } from "react-icons/hi";
 import { AiOutlineClose } from "react-icons/ai";
+import LanguageToggle from './LanguageToggle';
 
 import logo from "../../images/logo.png";
 
@@ -25,7 +26,7 @@ const navItems = [
   { title: "Loan", path: "/loan" },
   { title: "Lend", path: "/lend" },
   { title: "Transactions", path: "/transactions" },
-  { title: "Onboarding", path: "/onboarding" },
+  //{ title: "Onboarding", path: "/onboarding" },
   { title: "Profile", path: "/profile" }
 ];
 
@@ -39,9 +40,9 @@ const Navbar = () => {
   
   return (
     <nav className="w-full flex md:justify-center justify-between items-center p-4 fixed top-0 left-0 z-50 bg-primary">
-      <div className="md:flex-[0.5] flex-initial justify-center items-center">
+      <div className="md:flex-[0.5] pr-4 md:pl-6">
         <Link to="/dashboard">
-          <img src={logo} alt="logo" className="w-32 cursor-pointer" />
+          <img src={logo} alt="logo" className="w-48 md:w-48 cursor-pointer" />
         </Link>
       </div>
       <ul className="text-white md:flex hidden list-none flex-row justify-between items-center flex-initial">
@@ -81,6 +82,11 @@ const Navbar = () => {
             classProps="bg-gray-700 text-white py-1.5 px-4 mx-4 rounded-full cursor-pointer hover:bg-gray-600"
           />
         )}
+        
+        {/* Language Toggle */}
+        <div className="mx-4">
+          <LanguageToggle />
+        </div>
         
         <NavbarItem
           title="Login"
@@ -134,6 +140,11 @@ const Navbar = () => {
                 onClick={handleCloseMenu}
               />
             )}
+            
+            {/* Language Toggle in mobile menu */}
+            <div className="my-4 w-full flex justify-end">
+              <LanguageToggle />
+            </div>
           </ul>
         )}
       </div>

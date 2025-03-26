@@ -24,9 +24,11 @@ import {
   SelfiePage,
   UploadPayslipPage,
   OnboardingSuccessPage,
-  NotFoundPage
+  NotFoundPage,
+  WithdrawTutorialPage
 } from "./pages";
 import { ThemeProvider } from "./context/ThemeContext";
+import { LanguageProvider } from './contexts/LanguageContext';
 
 // Component to conditionally render Navbar based on route
 const AppContent = () => {
@@ -57,6 +59,7 @@ const AppContent = () => {
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/premium" element={<PremiumPage />} />
             <Route path="/lender-reports" element={<LenderReportsPage />} />
+            <Route path="/withdraw-tutorial" element={<WithdrawTutorialPage />} />
             
             {/* Onboarding routes */}
             <Route path="/onboarding" element={<Navigate to="/onboarding/welcome" replace />} />
@@ -80,11 +83,13 @@ const AppContent = () => {
 
 const App = () => {
   return (
-    <ThemeProvider>
-      <Router>
-        <AppContent />
-      </Router>
-    </ThemeProvider>
+    <LanguageProvider>
+      <ThemeProvider>
+        <Router>
+          <AppContent />
+        </Router>
+      </ThemeProvider>
+    </LanguageProvider>
   );
 };
 

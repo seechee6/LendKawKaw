@@ -68,10 +68,10 @@ const LoanApplicationForm = () => {
   const installmentAmount = Math.round((loanAmount / repaymentPeriod));
   
   // Calculate interest and fees (example calculation: 1.8% of loan amount)
-  const fees = Math.round(loanAmount * 0.018);
+  const fees = Math.round(loanAmount * 0.06);
   
   // Calculate lender protection fee (8% of loan amount)
-  const protectionFee = Math.round(loanAmount * 0.08);
+  const protectionFee = Math.round(loanAmount * 0.05);
   
   // Calculate total amount including protection fee
   const totalLoanAmount = loanAmount + protectionFee;
@@ -481,7 +481,7 @@ const LoanApplicationForm = () => {
                     <line x1="12" y1="16" x2="12" y2="12" />
                     <line x1="12" y1="8" x2="12" y2="8" />
                   </svg>
-                  <span className="text-gray-400">Interest & Fees</span>
+                  <span className="text-gray-400">Interest Rate (6%)</span>
                 </div>
                 <div className="flex items-center">
                   <span>RM {fees}</span>
@@ -496,7 +496,7 @@ const LoanApplicationForm = () => {
                   <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                   </svg>
-                  <span className="text-gray-400">Protection Fee (8%):</span>
+                  <span className="text-gray-400">Protection Fee (5%):</span>
                 </div>
                 <span>RM {protectionFee}</span>
               </div>

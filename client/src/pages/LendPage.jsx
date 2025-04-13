@@ -6,9 +6,12 @@ import { LoanCard, HalfCircleBackground } from '../components';
 import { FiChevronDown, FiChevronUp, FiLock, FiBarChart2 } from 'react-icons/fi';
 import { Link } from 'react-router-dom';
 import { HiOutlineEye, HiOutlineUser, HiOutlineCash, HiOutlineCalendar, HiOutlineBadgeCheck, HiOutlineChartBar, HiOutlineLightningBolt, HiOutlineSparkles } from 'react-icons/hi';
+import { useWallet } from '@solana/wallet-adapter-react';
+import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 
 const LendPage = () => {
-  const { currentAccount, connectWallet } = useContext(TransactionContext);
+  // const { currentAccount, connectWallet } = useContext(TransactionContext);
+  const { publicKey } = useWallet()
   const navigate = useNavigate();
   const [loanApplications, setLoanApplications] = useState([]);
   const [filter, setFilter] = useState('all'); // 'all', 'low-risk', 'low-amount'
@@ -193,7 +196,7 @@ const LendPage = () => {
   }, []);
 
   const handleFund = (loan) => {
-    if (!currentAccount) {
+    if (!publicKey) {
       alert("Please connect your wallet first");
       return;
     }
@@ -232,17 +235,14 @@ const LendPage = () => {
       <div className="pt-2 max-w-lg mx-auto w-full pb-20">
         <p className="text-white text-opacity-80 mb-6">Review and fund loan requests from borrowers.</p>
 
-        {!currentAccount ? (
+        {!publicKey ? (
           <div className="bg-white rounded-xl shadow-md p-6 mb-6 text-center">
             <p className="mb-4">Connect your wallet to start lending</p>
-            <button 
-              onClick={connectWallet}
-              className="flex flex-row justify-center rounded-full items-center bg-secondary p-3 cursor-pointer hover:bg-secondaryLight"
-            >
+            <WalletMultiButton/>
               <p className="text-white text-base font-semibold">
                 Connect Wallet
               </p>
-            </button>
+            
           </div>
         ) : (
           <>

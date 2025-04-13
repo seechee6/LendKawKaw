@@ -2,12 +2,14 @@ import React, { useState, useEffect, useContext } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { HalfCircleBackground } from '../components';
 import { TransactionContext } from '../context/TransactionContext';
+import { useWallet } from '@solana/wallet-adapter-react';
 
 const FundingReviewPage = () => {
   const { loanId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { currentAccount, fundLoan, isLoading } = useContext(TransactionContext);
+  const { publicKey } = useWallet();
+  const { fundLoan, isLoading } = useContext(TransactionContext);
   const [loan, setLoan] = useState(null);
   const [loadingLoan, setLoadingLoan] = useState(true);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -58,7 +60,7 @@ const FundingReviewPage = () => {
   }, [loanId, location]);
 
   const handleFundNow = async () => {
-    if (!currentAccount) {
+    if (!publicKey) {
       alert("Please connect your wallet first");
       return;
     }
@@ -66,11 +68,11 @@ const FundingReviewPage = () => {
     setTransactionError(null);
     
     try {
-      // Call the fundLoan function from our context to transfer ETH
-      const transactionResult = await fundLoan();
+      // Convert the loan amount to a number
+      const amount = parseFloat(loan.requestedAmount.replace(/,/g, ''));
       
-      // If we reach this point, the transaction was successful
-      console.log("Transaction successful:", transactionResult);
+      // Call fundLoan with the amount
+      const signature = await fundLoan(amount);
       
       // Navigate to success page with loan data
       navigate(`/funding-success/${loanId}`, { 
@@ -83,14 +85,16 @@ const FundingReviewPage = () => {
               day: 'numeric', 
               year: 'numeric'
             }),
-            transactionHash: transactionResult?.hash || null
+            transactionSignature: signature
           },
           isLender: true
         } 
       });
     } catch (error) {
       console.error("Error funding loan:", error);
-      setTransactionError("Transaction failed. Please try again.");
+      setTransactionError(
+        error.message || "Transaction failed. Please try again."
+      );
     }
   };
 
@@ -110,10 +114,28 @@ const FundingReviewPage = () => {
 
   // Get shortened wallet address for display
   const shortenAddress = (address) => {
-    return address 
-      ? `${address.substring(0, 4)}...${address.substring(address.length - 4)}`
-      : '0x00...0000';
+    if (!address) return '';
+    return `${address.toString().slice(0, 4)}...${address.toString().slice(-4)}`;
   };
+
+  const renderPaymentMethod = () => (
+    <div className="flex items-center justify-between">
+      <div className="flex items-center">
+        <div className="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center mr-3">
+          <img 
+            src="/phantom-icon.png" 
+            alt="Phantom"
+            className="w-6 h-6"
+          />
+        </div>
+        <div>
+          <p className="font-medium">Phantom Wallet</p>
+          <p className="text-gray-500 text-sm">{shortenAddress(publicKey)}</p>
+        </div>
+      </div>
+      <button className="text-secondary font-medium">Change</button>
+    </div>
+  );
 
   return (
     <HalfCircleBackground title="Funding Review">
@@ -187,23 +209,7 @@ const FundingReviewPage = () => {
         <div className="mb-6">
           <h3 className="text-gray-700 font-medium mb-3">Selected Payment Method</h3>
           <div className="bg-white rounded-xl shadow-sm p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <div className="w-10 h-10 rounded-full bg-orange-500 flex items-center justify-center mr-3">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white">
-                    <path d="M19 12h2l-3 4-3-4h2V8h-2l3-4 3 4h-2v4z"></path>
-                    <path d="M13 12h-2V8H9l3-4 3 4h-2v4z"></path>
-                    <path d="M5 12h2v4h2l-3 4-3-4h2v-4z"></path>
-                    <path d="M11 16h2v-4h2l-3-4-3 4h2v4z"></path>
-                  </svg>
-                </div>
-                <div>
-                  <p className="font-medium">Metamask</p>
-                  <p className="text-gray-500 text-sm">{shortenAddress(currentAccount)}</p>
-                </div>
-              </div>
-              <button className="text-secondary font-medium">Change</button>
-            </div>
+            {renderPaymentMethod()}
           </div>
         </div>
 
@@ -259,4 +265,4 @@ const FundingReviewPage = () => {
   );
 };
 
-export default FundingReviewPage; 
+export default FundingReviewPage;

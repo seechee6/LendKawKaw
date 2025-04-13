@@ -1,35 +1,18 @@
 import React, { useEffect, useState } from "react";
-import { ethers } from "ethers";
-
-import { contractABI, contractAddress } from "../utils/constants";
+import { WalletNotConnectedError } from '@solana/wallet-adapter-base';
+import { useConnection, useWallet } from '@solana/wallet-adapter-react';
+import { 
+  Keypair, 
+  SystemProgram, 
+  Transaction, 
+  PublicKey,
+  LAMPORTS_PER_SOL
+} from '@solana/web3.js';
 
 export const TransactionContext = React.createContext();
 
-const { ethereum } = window;
-
 // Get environment variables for loan funding using Vite's import.meta.env
-const SENDER_ADDRESS = import.meta.env.VITE_SENDER_ADDRESS;
 const RECEIVER_ADDRESS = import.meta.env.VITE_RECEIVER_ADDRESS;
-const LOAN_AMOUNT = import.meta.env.VITE_LOAN_AMOUNT;
-
-const createEthereumContract = async () => {
-  try {
-    if (!ethereum) return alert("Please install MetaMask!");
-
-    const provider = new ethers.BrowserProvider(ethereum);
-    const signer = await provider.getSigner();
-    const transactionsContract = new ethers.Contract(
-      contractAddress,
-      contractABI,
-      signer,
-    );
-
-    return transactionsContract;
-  } catch (error) {
-    console.log("Error creating contract:", error);
-    return null;
-  }
-};
 
 export const TransactionsProvider = ({ children }) => {
   const [formData, setformData] = useState({
@@ -44,205 +27,201 @@ export const TransactionsProvider = ({ children }) => {
     localStorage.getItem("transactionCount"),
   );
   const [transactions, setTransactions] = useState([]);
-
+  
+  const { connection } = useConnection();
+  const { publicKey, sendTransaction: solanaSendTransaction } = useWallet();
+  
   const handleChange = (e, name) => {
     setformData((prevState) => ({ ...prevState, [name]: e.target.value }));
   };
 
+  // Initialize transaction storage - simplified version without Anchor
+  const initializeTransactionStorage = async () => {
+    try {
+      if (!publicKey) throw new WalletNotConnectedError();
+      
+      setIsLoading(true);
+      
+      // Instead of creating an actual storage account on-chain,
+      // we'll just use localStorage to track transactions for simplicity
+      localStorage.setItem('transactionStorageInitialized', 'true');
+      localStorage.setItem('transactions', JSON.stringify([]));
+      
+      setIsLoading(false);
+      console.log("Transaction storage initialized in local storage");
+      
+      return 'local-storage';
+    } catch (error) {
+      console.error("Error initializing transaction storage:", error);
+      setIsLoading(false);
+      throw error;
+    }
+  };
+
+  // Add a transaction - simplified version without Anchor
+  const addTransaction = async (receiverAddress, amount, message, keyword) => {
+    try {
+      if (!publicKey) throw new WalletNotConnectedError();
+      
+      setIsLoading(true);
+      
+      // Check if storage is initialized
+      const storageInitialized = localStorage.getItem('transactionStorageInitialized');
+      if (!storageInitialized) {
+        await initializeTransactionStorage();
+      }
+      
+      const receiverPubkey = new PublicKey(receiverAddress);
+      
+      // Convert amount from SOL to lamports (Solana's smallest unit)
+      const lamports = amount * LAMPORTS_PER_SOL;
+      
+      // Create and send the SOL transfer transaction
+      const transaction = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: publicKey,
+          toPubkey: receiverPubkey,
+          lamports,
+        })
+      );
+      
+      const signature = await solanaSendTransaction(transaction, connection);
+      await connection.confirmTransaction(signature, 'confirmed');
+      
+      // Store transaction in local storage
+      const timestamp = Date.now() / 1000; // Unix timestamp in seconds
+      const newTransaction = {
+        sender: publicKey.toString(),
+        receiver: receiverPubkey.toString(),
+        amount: lamports,
+        message,
+        keyword,
+        timestamp,
+        signature
+      };
+      
+      // Get existing transactions
+      const existingTransactionsStr = localStorage.getItem('transactions') || '[]';
+      const existingTransactions = JSON.parse(existingTransactionsStr);
+      
+      // Add new transaction
+      existingTransactions.push(newTransaction);
+      localStorage.setItem('transactions', JSON.stringify(existingTransactions));
+      
+      console.log("Transaction added and SOL transferred:", signature);
+      
+      setIsLoading(false);
+      
+      // Increase transaction count
+      const newCount = (parseInt(transactionCount || "0") + 1).toString();
+      setTransactionCount(newCount);
+      localStorage.setItem("transactionCount", newCount);
+      
+      // Refresh transactions list
+      await getAllTransactions();
+      
+      return signature;
+    } catch (error) {
+      console.error("Error adding transaction:", error);
+      setIsLoading(false);
+      throw error;
+    }
+  };
+
+  // Get all transactions - simplified version without Anchor
   const getAllTransactions = async () => {
     try {
-      if (!ethereum) return alert("Please install MetaMask!");
-
-      const contract = await createEthereumContract();
-      if (!contract) return;
-
-      console.log("Fetching transactions from contract...");
-      if (typeof contract.getAllTransactions !== "function") {
-        console.error(
-          "getAllTransactions method doesn't exist on the contract",
-        );
-        return;
-      }
-
-      const availableTransactions = await contract.getAllTransactions();
-      console.log("Contract:", contract);
-      console.log("Raw transactions:", availableTransactions);
-
-      if (!availableTransactions || availableTransactions.length === 0) {
-        console.log("No transactions returned");
+      // Check if storage is initialized
+      const storageInitialized = localStorage.getItem('transactionStorageInitialized');
+      if (!storageInitialized) {
+        console.log("No transaction storage initialized yet");
         setTransactions([]);
         return;
       }
-      const txArray = Array.from(availableTransactions);
-
-      const structuredTransactions = txArray.map((transaction) => ({
-        addressTo: transaction.receiver,
-        addressFrom: transaction.sender,
-        timestamp: new Date(
-          Number(transaction.timestamp) * 1000,
-        ).toLocaleString(),
-        message: transaction.message,
-        keyword: transaction.keyword,
-        amount: ethers.formatEther(transaction.amount),
+      
+      // Get transactions from local storage
+      const transactionsStr = localStorage.getItem('transactions') || '[]';
+      const transactionsData = JSON.parse(transactionsStr);
+      
+      if (!transactionsData || transactionsData.length === 0) {
+        console.log("No transactions found");
+        setTransactions([]);
+        return;
+      }
+      
+      // Format transactions
+      const structuredTransactions = transactionsData.map((tx) => ({
+        addressTo: tx.receiver,
+        addressFrom: tx.sender,
+        timestamp: new Date(tx.timestamp * 1000).toLocaleString(),
+        message: tx.message,
+        keyword: tx.keyword,
+        amount: (tx.amount / LAMPORTS_PER_SOL).toString(),
+        signature: tx.signature
       }));
-
+      
       console.log("Structured transactions:", structuredTransactions);
       setTransactions(structuredTransactions);
     } catch (error) {
-      console.error("Error getting transactions:", error?.message || error);
+      console.error("Error getting transactions:", error);
       setTransactions([]);
     }
   };
 
-  const checkIfWalletIsConnect = async () => {
-    try {
-      if (!ethereum) {
-        console.log("No MetaMask detected");
-        return;
-      }
-
-      const accounts = await ethereum.request({ method: "eth_accounts" });
-      console.log("Connected accounts:", accounts);
-
-      if (accounts.length) {
-        setCurrentAccount(accounts[0]);
-        console.log("Fetching transactions...");
-        await getAllTransactions();
-      }
-    } catch (error) {
-      console.error("Error checking wallet connection:", error);
-    }
-  };
-
-  const checkIfTransactionsExists = async () => {
-    try {
-      if (!ethereum) return alert("Please install MetaMask!");
-
-      const contract = await createEthereumContract();
-      if (!contract) return;
-
-      console.log("Available contract methods:", Object.keys(contract));
-
-      const count = await contract.getAllTransactionCount();
-
-      if (count) {
-        window.localStorage.setItem("transactionCount", count.toString());
-        setTransactionCount(count.toString());
-      }
-    } catch (error) {
-      console.log("Error checking transactions:", error?.message || error);
-    }
-  };
-
-  const connectWallet = async () => {
-    try {
-      if (!ethereum) return alert("Please install MetaMask.");
-
-      const accounts = await ethereum.request({
-        method: "eth_requestAccounts",
-      });
-
-      setCurrentAccount(accounts[0]);
-      window.location.reload();
-    } catch (error) {
-      console.log(error);
-
-      throw new Error("No ethereum object");
-    }
-  };
-
+  // Use the addTransaction function for the main sendTransaction functionality
   const sendTransaction = async () => {
     try {
-      if (!ethereum) return alert("Please install MetaMask.");
-
+      if (!publicKey) throw new WalletNotConnectedError();
+      
       const { addressTo, amount, keyword, message } = formData;
-      const transactionsContract = await createEthereumContract();
-      if (!transactionsContract) return;
-      const parsedAmount = ethers.parseEther(amount);
-      await ethereum.request({
-        method: "eth_sendTransaction",
-        params: [
-          {
-            from: currentAccount,
-            to: addressTo,
-            gas: "0x5208",
-            value: parsedAmount.toString(),
-          },
-        ],
-      });
-      const transactionHash = await transactionsContract.addToBlockchain(
-        addressTo,
-        parsedAmount,
-        message,
-        keyword,
-      );
-
-      setIsLoading(true);
-      console.log(`Loading - ${transactionHash.hash}`);
-      await transactionHash.wait();
-      console.log(`Success - ${transactionHash.hash}`);
-      setIsLoading(false);
-      const transactionsCount =
-        await transactionsContract.getAllTransactionCount();
-      setTransactionCount(transactionsCount.toString());
+      if (!addressTo || !amount || !keyword || !message) {
+        alert("Please fill all fields");
+        return;
+      }
+      
+      return await addTransaction(addressTo, parseFloat(amount), message, keyword);
     } catch (error) {
-      console.error("Transaction error:", error);
-      setIsLoading(false);
+      console.error("Send transaction error:", error);
       throw error;
     }
   };
 
   const fundLoan = async () => {
     try {
-      if (!ethereum) return alert("Please install MetaMask.");
-
+      if (!publicKey) throw new WalletNotConnectedError();
+      
       setIsLoading(true);
       
-      // Use hardcoded addresses from environment variables
-      const addressTo = RECEIVER_ADDRESS;
-      const addressFrom = currentAccount; // Use connected wallet instead of SENDER_ADDRESS
-      const amount = LOAN_AMOUNT;
+      // Get receiver address
+      const receiverPublicKey = new PublicKey(RECEIVER_ADDRESS);
       
-      const transactionsContract = await createEthereumContract();
-      if (!transactionsContract) {
-        setIsLoading(false);
-        return;
-      }
+      // Set default loan amount
+      const lamports = 1_500_000; // Adjust as needed
       
-      const parsedAmount = ethers.parseEther(amount);
+      // Create a transaction to transfer SOL
+      const transaction = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: publicKey,
+          toPubkey: receiverPublicKey,
+          lamports,
+        })
+      );
       
-      // Make the transaction request
-      await ethereum.request({
-        method: "eth_sendTransaction",
-        params: [
-          {
-            from: addressFrom,
-            to: addressTo,
-            gas: "0x5208", // 21000 GWEI
-            value: parsedAmount.toString(),
-          },
-        ],
+      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+      transaction.recentBlockhash = blockhash;
+      transaction.feePayer = publicKey;
+      
+      const signature = await solanaSendTransaction(transaction, connection);
+      await connection.confirmTransaction({
+        blockhash,
+        lastValidBlockHeight,
+        signature
       });
       
-      // Add transaction to blockchain through smart contract
-      const transactionHash = await transactionsContract.addToBlockchain(
-        addressTo,
-        parsedAmount,
-        "Loan Funding", // message
-        "loan", // keyword
-      );
-
-      console.log(`Loading - ${transactionHash.hash}`);
-      await transactionHash.wait();
-      console.log(`Success - ${transactionHash.hash}`);
-      
+      console.log("Loan funded successfully:", signature);
       setIsLoading(false);
       
-      // Update transaction count
-      const transactionsCount = await transactionsContract.getAllTransactionCount();
-      setTransactionCount(transactionsCount.toString());
-      
-      return transactionHash;
+      return signature;
     } catch (error) {
       console.error("Loan funding error:", error);
       setIsLoading(false);
@@ -251,35 +230,26 @@ export const TransactionsProvider = ({ children }) => {
   };
 
   useEffect(() => {
-    const init = async () => {
-      await checkIfWalletIsConnect();
-      await checkIfTransactionsExists();
-    };
-    init();
-  }, []);
-
-  useEffect(() => {
-    if (currentAccount) {
+    if (publicKey) {
+      setCurrentAccount(publicKey.toString());
       getAllTransactions();
     }
-  }, [currentAccount, transactionCount]);
-
-  useEffect(() => {
-    console.log("Transactions updated:", transactions);
-  }, [transactions]);
+  }, [publicKey]);
 
   return (
     <TransactionContext.Provider
       value={{
-        transactionCount,
-        connectWallet,
-        transactions,
+        connectWallet: () => {}, // This is handled by the wallet adapter
         currentAccount,
-        isLoading,
-        sendTransaction,
-        handleChange,
         formData,
+        setformData,
+        handleChange,
+        sendTransaction,
         fundLoan,
+        transactions,
+        isLoading,
+        initializeTransactionStorage,
+        getAllTransactions
       }}
     >
       {children}

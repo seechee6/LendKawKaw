@@ -11,4 +11,3 @@ export { default as Button } from "./Button";
 export { default as WalletCard } from "./WalletCard";
 export { default as ThemeSwitcher } from "./ThemeSwitcher";
 export { default as ActionButtons } from "./ActionButtons";
-export { default as LanguageToggle } from "./LanguageToggle";

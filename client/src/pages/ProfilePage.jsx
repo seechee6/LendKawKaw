@@ -1,190 +1,101 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { HalfCircleBackground } from '../components';
-import { ethers } from 'ethers';
-import { useLanguage } from '../contexts/LanguageContext';
-import LanguageToggle from '../components/LanguageToggle';
+import { useConnection, useWallet } from '@solana/wallet-adapter-react';
+import { LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { TransactionContext } from '../context/TransactionContext';
+
+// Define translations directly
+const translations = {
+  sepoliaEth: 'SOL',
+  wrongNetwork: 'Wrong Network',
+  connecting: 'Connecting...',
+  connectWallet: 'Connect Wallet',
+  loadingBalance: 'Loading...',
+  refresh: 'Refresh',
+  howToWithdraw: 'How to withdraw',
+  points: 'points',
+  good: 'Good',
+  updatedAfterRepayment: 'Updated after each repayment',
+  makePayment: 'Make Payment',
+  loanHistory: 'Loan History',
+  more: 'More',
+  loanSummary: 'Loan Summary',
+  repaymentHistory: 'Repayment History',
+  activeLoans: 'Active Loans',
+  excellent: 'Excellent',
+  currentBalance: 'Current Balance',
+  nextPayment: 'Next Payment',
+  maxLoanAmount: 'Max Loan Amount',
+  seeFullHistory: 'See Full History',
+  initialize: 'Initialize Storage'
+};
 
 const ProfilePage = () => {
   const navigate = useNavigate();
-  const { language, t } = useLanguage();
+  const { connection } = useConnection();
+  const { publicKey, connected, disconnect } = useWallet();
+  const { initializeTransactionStorage, isLoading } = useContext(TransactionContext);
   
   const [isPremium] = useState(true); // In a real app, this would come from context/API
-  const [walletAddress, setWalletAddress] = useState('');
   const [walletBalance, setWalletBalance] = useState(null);
-  const [isWalletConnected, setIsWalletConnected] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [networkError, setNetworkError] = useState(false);
   const [isBalanceLoading, setIsBalanceLoading] = useState(false);
+  const [networkError, setNetworkError] = useState(false);
+  const [storageInitialized, setStorageInitialized] = useState(false);
 
   useEffect(() => {
-    checkIfWalletIsConnected();
-    
-    // Listen for network changes
-    if (window.ethereum) {
-      window.ethereum.on('chainChanged', handleChainChanged);
-      window.ethereum.on('accountsChanged', handleAccountsChanged);
-    }
-    
-    return () => {
-      if (window.ethereum) {
-        window.ethereum.removeListener('chainChanged', handleChainChanged);
-        window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
-      }
+    // Check if transaction storage is already initialized
+    const checkStorageInitialized = () => {
+      const storageInitialized = localStorage.getItem('transactionStorageInitialized');
+      setStorageInitialized(!!storageInitialized);
     };
-  }, []);
-
-  const handleChainChanged = () => {
-    // Reload the page when chain changes
-    window.location.reload();
-  };
-
-  const handleAccountsChanged = (accounts) => {
-    if (accounts.length > 0) {
-      setWalletAddress(accounts[0]);
-      getWalletBalance(accounts[0]);
-    } else {
-      setWalletAddress('');
-      setWalletBalance(null);
-      setIsWalletConnected(false);
+    
+    checkStorageInitialized();
+    
+    if (publicKey) {
+      getWalletBalance(publicKey);
     }
-  };
+  }, [publicKey, connection]);
 
-  const checkIfWalletIsConnected = async () => {
+  const handleInitializeStorage = async () => {
     try {
-      if (!window.ethereum) {
-        console.log("Please install MetaMask");
-        return;
-      }
-
-      setIsLoading(true);
-      
-      // Check if we're on Sepolia network
-      const chainId = await window.ethereum.request({ method: 'eth_chainId' });
-      const sepoliaChainId = '0xaa36a7'; // Chain ID for Sepolia
-      
-      if (chainId !== sepoliaChainId) {
-        try {
-          await window.ethereum.request({
-            method: 'wallet_switchEthereumChain',
-            params: [{ chainId: sepoliaChainId }],
-          });
-        } catch (switchError) {
-          // This error code indicates that the chain has not been added to MetaMask
-          if (switchError.code === 4902) {
-            try {
-              await window.ethereum.request({
-                method: 'wallet_addEthereumChain',
-                params: [{
-                  chainId: sepoliaChainId,
-                  chainName: 'Sepolia Test Network',
-                  nativeCurrency: {
-                    name: 'Sepolia ETH',
-                    symbol: 'ETH',
-                    decimals: 18
-                  },
-                  rpcUrls: ['https://sepolia.infura.io/v3/'],
-                  blockExplorerUrls: ['https://sepolia.etherscan.io']
-                }]
-              });
-            } catch (addError) {
-              console.error('Error adding Sepolia network:', addError);
-              setNetworkError(true);
-            }
-          }
-          console.error('Error switching to Sepolia network:', switchError);
-          setNetworkError(true);
-        }
-      }
-
-      const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-
-      if (accounts.length) {
-        setWalletAddress(accounts[0]);
-        setIsWalletConnected(true);
-        await getWalletBalance(accounts[0]);
-      } else {
-        console.log('No authorized account found');
-      }
-      setIsLoading(false);
+      await initializeTransactionStorage();
+      setStorageInitialized(true);
     } catch (error) {
-      console.error(error);
-      setIsLoading(false);
-    }
-  };
-
-  const connectWallet = async () => {
-    try {
-      if (!window.ethereum) {
-        alert("Please install MetaMask");
-        return;
-      }
-
-      setIsLoading(true);
-      setNetworkError(false);
-
-      // Request account access
-      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-      
-      // Check and switch to Sepolia network
-      const chainId = await window.ethereum.request({ method: 'eth_chainId' });
-      const sepoliaChainId = '0xaa36a7'; // Chain ID for Sepolia
-      
-      if (chainId !== sepoliaChainId) {
-        try {
-          await window.ethereum.request({
-            method: 'wallet_switchEthereumChain',
-            params: [{ chainId: sepoliaChainId }],
-          });
-        } catch (switchError) {
-          setNetworkError(true);
-          setIsLoading(false);
-          return;
-        }
-      }
-      
-      setWalletAddress(accounts[0]);
-      setIsWalletConnected(true);
-      await getWalletBalance(accounts[0]);
-      setIsLoading(false);
-    } catch (error) {
-      console.error(error);
-      setIsLoading(false);
+      console.error("Failed to initialize storage:", error);
     }
   };
 
   const getWalletBalance = async (address) => {
     try {
-      if (!window.ethereum) return;
+      if (!address) return;
       
-      setIsBalanceLoading(true); // Set loading state
+      setIsBalanceLoading(true);
       
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      const network = await provider.getNetwork();
-      
-      if (network.chainId !== BigInt(11155111)) {
-        setWalletBalance(t.wrongNetwork);
+      try {
+        const balance = await connection.getBalance(address);
+        const formattedBalance = (balance / LAMPORTS_PER_SOL).toFixed(4);
+        setWalletBalance(formattedBalance);
+        setNetworkError(false);
+      } catch (error) {
+        console.error("Error fetching Solana balance:", error);
+        setWalletBalance("Error");
         setNetworkError(true);
-        setIsBalanceLoading(false); // Clear loading state
-        return;
       }
       
-      const balance = await provider.getBalance(address);
-      const formattedBalance = ethers.formatEther(balance);
-      setWalletBalance(parseFloat(formattedBalance).toFixed(4));
-      setNetworkError(false);
-      setIsBalanceLoading(false); // Clear loading state
+      setIsBalanceLoading(false);
     } catch (error) {
       console.error("Error fetching balance:", error);
       setWalletBalance("Error");
-      setIsBalanceLoading(false); // Clear loading state
+      setIsBalanceLoading(false);
     }
   };
 
   // Format address for display
   const formatAddress = (address) => {
     if (!address) return '';
-    return address.slice(0, 6) + '...' + address.slice(-4);
+    const addressStr = address.toString();
+    return addressStr.slice(0, 6) + '...' + addressStr.slice(-4);
   };
 
   return (
@@ -205,17 +116,17 @@ const ProfilePage = () => {
                     strokeLinejoin="round"
                   />
                 </svg>
-                <span className="text-sm font-medium">{t.sepoliaEth}</span>
+                <span className="text-sm font-medium">{translations.sepoliaEth}</span>
               </div>
               {networkError && (
                 <span className="text-xs bg-red-500 bg-opacity-20 px-2 py-0.5 rounded-full">
-                  {t.wrongNetwork}
+                  {translations.wrongNetwork}
                 </span>
               )}
             </div>
             
             <div className="flex items-center space-x-2">
-              {isWalletConnected && (
+              {connected && (
                 <button 
                   onClick={() => navigate('/withdraw-tutorial')}
                   className="text-xs bg-white bg-opacity-20 hover:bg-opacity-30 transition-all rounded-full py-1 px-2 flex items-center"
@@ -223,50 +134,42 @@ const ProfilePage = () => {
                   <svg className="w-3 h-3 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                   </svg>
-                  {t.howToWithdraw}
+                  {translations.howToWithdraw}
                 </button>
               )}
               
-              {isWalletConnected ? (
+              {connected ? (
                 <button 
-                  onClick={() => getWalletBalance(walletAddress)}
+                  onClick={() => publicKey && getWalletBalance(publicKey)}
                   className="text-xs bg-white bg-opacity-20 hover:bg-opacity-30 transition-all rounded-full py-1 px-2 flex items-center"
                 >
                   <svg className="w-3 h-3 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                   </svg>
-                  {t.refresh}
+                  {translations.refresh}
                 </button>
-              ) : (
-                <button 
-                  onClick={connectWallet}
-                  disabled={isLoading}
-                  className="text-xs bg-white text-blue-600 font-medium py-1 px-3 rounded-full hover:bg-opacity-90 transition-all disabled:opacity-70"
-                >
-                  {isLoading ? t.connecting : t.connectWallet}
-                </button>
-              )}
+              ) : null}
             </div>
           </div>
 
-          {isWalletConnected && (
+          {connected && publicKey && (
             <div className="mt-3 flex items-center justify-between">
               <div className="flex items-center space-x-4">
                 <div>
                   <div className="text-2xl font-bold">
-                    {networkError ? t.wrongNetwork : (
+                    {networkError ? translations.wrongNetwork : (
                       isBalanceLoading ? (
                         <div className="flex items-center space-x-2">
                           <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                          <span className="text-lg">{t.loadingBalance}</span>
+                          <span className="text-lg">{translations.loadingBalance}</span>
                         </div>
                       ) : (
-                        `${walletBalance} ETH`
+                        `${walletBalance} SOL`
                       )
                     )}
                   </div>
                   <div className="text-xs opacity-80 mt-0.5 font-mono">
-                    {formatAddress(walletAddress)}
+                    {formatAddress(publicKey)}
                   </div>
                 </div>
               </div>
@@ -309,11 +212,11 @@ const ProfilePage = () => {
                   <svg className="w-3 h-3 mr-1 fill-current" viewBox="0 0 24 24">
                     <path d="M12 8l-6 6 1.41 1.41L12 10.83l4.59 4.58L18 14z" />
                   </svg>
-                  +5 {t.points}
+                  +5 {translations.points}
                 </div>
                 <div className="text-5xl font-bold mb-1">725</div>
                 <div className="text-gray-600 text-sm flex items-center">
-                  {t.good}
+                  {translations.good}
                   <svg className="w-4 h-4 ml-1 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                     <circle cx="12" cy="12" r="10" strokeWidth="2" />
                     <path strokeLinecap="round" strokeWidth="2" d="M12 16v-4M12 8h.01" />
@@ -331,41 +234,65 @@ const ProfilePage = () => {
               <svg className="w-4 h-4 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
-              {t.updatedAfterRepayment}
+              {translations.updatedAfterRepayment}
             </div>
           </div>
         </div>
 
         {/* Action Buttons */}
         <div className="flex justify-between mb-6">
-          <div className="flex flex-col items-center w-1/3">
+          <div 
+            className="flex flex-col items-center w-1/3 cursor-pointer"
+            onClick={() => navigate('/make-payment')}
+          >
             <div className="bg-white rounded-full p-4 shadow-sm mb-2 flex items-center justify-center">
               <svg className="h-6 w-6 text-blue-500" viewBox="0 0 24 24" fill="none">
                 <rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" strokeWidth="2" />
                 <path d="M12 8v8m-4-4h8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
               </svg>
             </div>
-            <span className="text-xs text-gray-500">{t.makePayment}</span>
+            <span className="text-xs text-gray-500">{translations.makePayment}</span>
           </div>
 
-          <div className="flex flex-col items-center w-1/3">
+          <div 
+            className="flex flex-col items-center w-1/3 cursor-pointer"
+            onClick={() => navigate('/loan-history')}
+          >
             <div className="bg-white rounded-full p-4 shadow-sm mb-2 flex items-center justify-center">
               <svg className="h-6 w-6 text-blue-500" viewBox="0 0 24 24" fill="none">
                 <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </div>
-            <span className="text-xs text-gray-500">{t.loanHistory}</span>
+            <span className="text-xs text-gray-500">{translations.loanHistory}</span>
           </div>
 
           <div className="flex flex-col items-center w-1/3">
-            <div className="bg-white rounded-full p-4 shadow-sm mb-2 flex items-center justify-center">
-              <svg className="h-6 w-6 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <circle cx="5" cy="12" r="1" fill="currentColor" />
-                <circle cx="12" cy="12" r="1" fill="currentColor" />
-                <circle cx="19" cy="12" r="1" fill="currentColor" />
-              </svg>
-            </div>
-            <span className="text-xs text-gray-500">{t.more}</span>
+            {!storageInitialized && connected ? (
+              <div 
+                className="flex flex-col items-center cursor-pointer"
+                onClick={handleInitializeStorage}
+              >
+                <div className="bg-white rounded-full p-4 shadow-sm mb-2 flex items-center justify-center">
+                  <svg className="h-6 w-6 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                </div>
+                <span className="text-xs text-gray-500">
+                  {isLoading ? 'Initializing...' : translations.initialize}
+                </span>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center">
+                <div className="bg-white rounded-full p-4 shadow-sm mb-2 flex items-center justify-center">
+                  <svg className="h-6 w-6 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <circle cx="5" cy="12" r="1" fill="currentColor" />
+                    <circle cx="12" cy="12" r="1" fill="currentColor" />
+                    <circle cx="19" cy="12" r="1" fill="currentColor" />
+                  </svg>
+                </div>
+                <span className="text-xs text-gray-500">{translations.more}</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -375,42 +302,42 @@ const ProfilePage = () => {
             <svg className="w-5 h-5 mr-2 text-gray-700" viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <h2 className="text-base font-bold">{t.loanSummary}</h2>
+            <h2 className="text-base font-bold">{translations.loanSummary}</h2>
           </div>
           
           <div className="grid grid-cols-2 gap-y-6">
             <div>
-              <p className="text-sm text-gray-500 mb-1">{t.repaymentHistory}</p>
+              <p className="text-sm text-gray-500 mb-1">{translations.repaymentHistory}</p>
               <p className="text-2xl font-bold mb-1">100%</p>
               <div className="flex items-center">
                 <div className="w-3 h-3 rounded-full bg-green-500 mr-1"></div>
-                <p className="text-sm text-gray-500">{t.excellent}</p>
+                <p className="text-sm text-gray-500">{translations.excellent}</p>
               </div>
             </div>
             
             <div>
-              <p className="text-sm text-gray-500 mb-1">{t.activeLoans}</p>
+              <p className="text-sm text-gray-500 mb-1">{translations.activeLoans}</p>
               <p className="text-2xl font-bold mb-1">1</p>
               <div className="flex items-center">
                 <div className="w-3 h-3 rounded-full bg-blue-500 mr-1"></div>
-                <p className="text-sm text-gray-500">{t.good}</p>
+                <p className="text-sm text-gray-500">{translations.good}</p>
               </div>
             </div>
             
             <div>
-              <p className="text-sm text-gray-500 mb-1">{t.currentBalance}</p>
+              <p className="text-sm text-gray-500 mb-1">{translations.currentBalance}</p>
               <p className="text-2xl font-bold mb-1">RM 1,875</p>
               <div className="flex items-center justify-center">
-                <span className="text-gray-500 text-xs">{t.nextPayment}</span>
+                <span className="text-gray-500 text-xs">{translations.nextPayment}</span>
                 <span className="text-xs ml-1">15 Apr</span>
               </div>
             </div>
             
             <div>
-              <p className="text-sm text-gray-500 mb-1">{t.maxLoanAmount}</p>
+              <p className="text-sm text-gray-500 mb-1">{translations.maxLoanAmount}</p>
               <p className="text-2xl font-bold mb-1">RM 5,000</p>
               <div>
-                <span className="text-xs text-secondary">{t.excellent}</span>
+                <span className="text-xs text-secondary">{translations.excellent}</span>
               </div>
             </div>
           </div>
@@ -419,7 +346,7 @@ const ProfilePage = () => {
             onClick={() => navigate('/loan-history')}
             className="mt-6 w-full text-blue-500 text-center flex items-center justify-center"
           >
-            {t.seeFullHistory} →
+            {translations.seeFullHistory} →
           </button>
         </div>
       </div>

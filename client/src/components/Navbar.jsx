@@ -2,8 +2,6 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { HiMenuAlt4 } from "react-icons/hi";
 import { AiOutlineClose } from "react-icons/ai";
-import LanguageToggle from './LanguageToggle';
-
 import logo from "../../images/logo.png";
 
 const NavbarItem = ({ title, classProps, to, onClick }) => {
@@ -85,7 +83,6 @@ const Navbar = () => {
         
         {/* Language Toggle */}
         <div className="mx-4">
-          <LanguageToggle />
         </div>
         
         <NavbarItem
@@ -143,7 +140,6 @@ const Navbar = () => {
             
             {/* Language Toggle in mobile menu */}
             <div className="my-4 w-full flex justify-end">
-              <LanguageToggle />
             </div>
           </ul>
         )}

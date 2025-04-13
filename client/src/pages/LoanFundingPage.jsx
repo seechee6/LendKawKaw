@@ -49,10 +49,10 @@ const LoanFundingPage = () => {
   }, [loanId, location]);
 
   const handleFund = () => {
-    if (!currentAccount) {
-      alert("Please connect your wallet first");
-      return;
-    }
+    // if (!currentAccount) {
+    //   alert("Please connect your wallet first");
+    //   return;
+    // }
     navigate(`/funding-review/${loanId}`, { state: { loan }});
   };
 

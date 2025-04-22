@@ -1,27 +1,56 @@
-export { default as HomePage } from './HomePage';
-export { default as LendPage } from './LendPage';
-export { default as LoanPage } from './LoanPage';
-export { default as LoanConfirmationPage } from './LoanConfirmationPage';
-export { default as LoanSuccessPage } from './LoanSuccessPage';
-export { default as ProfilePage } from './ProfilePage';
-export { default as TransactionsPage } from './TransactionsPage';
-export { default as LoanRepaymentPage } from './LoanRepaymentPage';
-export { default as ReviewSummaryPage } from './ReviewSummaryPage';
-export { default as PremiumPage } from './PremiumPage';
-export { default as LenderReportsPage } from './LenderReportsPage';
-export { default as NotFoundPage } from './NotFoundPage';
-export { default as LoanFundingPage } from './LoanFundingPage';
-export { default as FundingReviewPage } from './FundingReviewPage';
-export { default as LoanFundingSuccessPage } from './LoanFundingSuccessPage';
+import LoanPage from "./LoanPage";
+import LendPage from "./LendPage";
+import HomePage from "./HomePage";
+import TransactionsPage from "./TransactionsPage";
+import LoanConfirmationPage from "./LoanConfirmationPage";
+import LoanSuccessPage from "./LoanSuccessPage";
+import ProfilePage from "./ProfilePage";
+import LoanRepaymentPage from "./LoanRepaymentPage";
+import ReviewSummaryPage from "./ReviewSummaryPage";
+import PremiumPage from "./PremiumPage";
+import LenderReportsPage from "./LenderReportsPage";
+import LoanFundingPage from "./LoanFundingPage";
+import FundingReviewPage from "./FundingReviewPage";
+import LoanFundingSuccessPage from "./LoanFundingSuccessPage";
+import NotFoundPage from "./NotFoundPage";
+import WithdrawTutorialPage from "./WithdrawTutorialPage";
+import SolanaTestPage from "./SolanaTestPage";
+import LoanDetailPage from "./LoanDetailPage";
 
-// Onboarding flow pages
-export { default as OnboardingWelcome } from './OnboardingWelcome';
-export { default as PersonalInfoPage } from './PersonalInfoPage';
-export { default as JobInfoPage } from './JobInfoPage';
-export { default as UploadIDPage } from './UploadIDPage';
-export { default as SelfiePage } from './SelfiePage';
-export { default as UploadPayslipPage } from './UploadPayslipPage';
-export { default as OnboardingSuccessPage } from './OnboardingSuccessPage';
+// Onboarding Pages
+import OnboardingWelcome from "./OnboardingWelcome";
+import PersonalInfoPage from "./PersonalInfoPage";
+import JobInfoPage from "./JobInfoPage";
+import UploadIDPage from "./UploadIDPage";
+import SelfiePage from "./SelfiePage";
+import UploadPayslipPage from "./UploadPayslipPage";
+import OnboardingSuccessPage from "./OnboardingSuccessPage";
 
-export { default as WithdrawTutorialPage } from './WithdrawTutorialPage';
+export {
+  LoanPage,
+  LendPage,
+  HomePage,
+  TransactionsPage,
+  LoanConfirmationPage,
+  LoanSuccessPage,
+  ProfilePage,
+  LoanRepaymentPage,
+  ReviewSummaryPage,
+  PremiumPage,
+  LenderReportsPage,
+  LoanFundingPage,
+  FundingReviewPage,
+  LoanFundingSuccessPage,
+  NotFoundPage,
+  OnboardingWelcome,
+  PersonalInfoPage,
+  JobInfoPage,
+  UploadIDPage,
+  SelfiePage,
+  UploadPayslipPage,
+  OnboardingSuccessPage,
+  WithdrawTutorialPage,
+  SolanaTestPage,
+  LoanDetailPage,
+};
 

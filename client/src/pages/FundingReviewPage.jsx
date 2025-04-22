@@ -1,19 +1,25 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { HalfCircleBackground } from '../components';
-import { TransactionContext } from '../context/TransactionContext';
-import { useWallet } from '@solana/wallet-adapter-react';
+import { useConnection, useWallet } from '@solana/wallet-adapter-react';
+import { fundLoanOnChain } from '../services/solanaService';
+import { toast } from 'react-hot-toast';
 
 const FundingReviewPage = () => {
   const { loanId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { publicKey } = useWallet();
-  const { fundLoan, isLoading } = useContext(TransactionContext);
+  const { publicKey, connected } = useWallet();
+  const { connection } = useConnection();
+  
   const [loan, setLoan] = useState(null);
   const [loadingLoan, setLoadingLoan] = useState(true);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [transactionError, setTransactionError] = useState(null);
+  const [isBlockchainLoan, setIsBlockchainLoan] = useState(false);
+  const [loanPublicKey, setLoanPublicKey] = useState(null);
+  const [borrowerPublicKey, setBorrowerPublicKey] = useState(null);
 
   useEffect(() => {
     // Get loan data from location state or fetch it
@@ -23,6 +29,14 @@ const FundingReviewPage = () => {
         if (location.state && location.state.loan) {
           // Use the loan data passed via navigation
           setLoan(location.state.loan);
+          
+          // Check if this is a blockchain loan
+          if (location.state.isBlockchainLoan) {
+            setIsBlockchainLoan(true);
+            setLoanPublicKey(location.state.loanPublicKey);
+            setBorrowerPublicKey(location.state.borrowerPublicKey);
+          }
+          
           setLoadingLoan(false);
         } else {
           // In a real app, this would fetch loan data from your API/blockchain
@@ -52,6 +66,7 @@ const FundingReviewPage = () => {
         }
       } catch (error) {
         console.error("Error fetching loan details:", error);
+        toast.error("Failed to load loan details");
         setLoadingLoan(false);
       }
     };
@@ -60,19 +75,47 @@ const FundingReviewPage = () => {
   }, [loanId, location]);
 
   const handleFundNow = async () => {
-    if (!publicKey) {
-      alert("Please connect your wallet first");
+    if (!connected) {
+      toast.error("Please connect your wallet first");
       return;
     }
     
     setTransactionError(null);
+    setIsProcessing(true);
     
     try {
-      // Convert the loan amount to a number
-      const amount = parseFloat(loan.requestedAmount.replace(/,/g, ''));
+      let signature = '';
       
-      // Call fundLoan with the amount
-      const signature = await fundLoan(amount);
+      if (isBlockchainLoan) {
+        // For blockchain loans, use the fundLoanOnChain function
+        toast.loading("Processing blockchain transaction...");
+        
+        // Convert the loan amount from string to number
+        const amount = parseFloat(loan.requestedAmount || loan.amount);
+        
+        // Call fundLoanOnChain with the loan details
+        signature = await fundLoanOnChain(
+          connection, 
+          {publicKey}, // Use wallet interface compatible with the function
+          loanPublicKey,
+          borrowerPublicKey,
+          amount
+        );
+        
+        toast.dismiss();
+        toast.success("Loan funded successfully on blockchain!");
+      } else {
+        // For mock loans, use the old method or simulate
+        toast.loading("Processing transaction...");
+        
+        // Simulate a transaction
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        signature = 'mock-tx-' + Math.random().toString(36).substring(2, 10);
+        
+        toast.dismiss();
+        toast.success("Loan funded successfully!");
+      }
       
       // Navigate to success page with loan data
       navigate(`/funding-success/${loanId}`, { 
@@ -85,16 +128,22 @@ const FundingReviewPage = () => {
               day: 'numeric', 
               year: 'numeric'
             }),
-            transactionSignature: signature
+            transactionSignature: signature,
+            isBlockchainLoan,
+            loanPublicKey
           },
           isLender: true
         } 
       });
     } catch (error) {
       console.error("Error funding loan:", error);
+      toast.dismiss();
+      toast.error("Transaction failed. Please try again.");
       setTransactionError(
         error.message || "Transaction failed. Please try again."
       );
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -140,13 +189,25 @@ const FundingReviewPage = () => {
   return (
     <HalfCircleBackground title="Funding Review">
       <div className="max-w-lg mx-auto pt-1 w-full pb-8">
+        {/* Blockchain indicator for blockchain loans */}
+        {isBlockchainLoan && (
+          <div className="mb-4 bg-blue-100 text-blue-800 px-4 py-2 rounded-lg flex items-center">
+            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            <span>This transaction will be recorded on the Solana blockchain</span>
+          </div>
+        )}
+      
         {/* Loan Amount Card */}
         <div className="bg-white rounded-xl shadow-md overflow-hidden mb-6">
           <div className="p-6">
             <div className="mb-5">
-              <h2 className="text-3xl font-bold text-gray-800">RM {loan.requestedAmount}</h2>
+              <h2 className="text-3xl font-bold text-gray-800">RM {loan.requestedAmount || loan.amount}</h2>
               <div className="flex items-center mt-1">
-                <p className="text-gray-500 text-sm">Loan ID: {loan.id}</p>
+                <p className="text-gray-500 text-sm">
+                  {isBlockchainLoan ? 'Blockchain ID:' : 'Loan ID:'} {isBlockchainLoan ? loanPublicKey.substring(0, 8) + '...' : loan.id}
+                </p>
                 <button className="ml-2 text-secondary">
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -183,22 +244,28 @@ const FundingReviewPage = () => {
                   </div>
                   <div className="flex justify-between">
                     <p className="text-gray-600">Monthly Payment</p>
-                    <p className="font-medium">RM {loan.monthlyPayment}</p>
-                  </div>
-                  <div className="flex justify-between">
-                    <p className="text-gray-600">Purpose</p>
-                    <p className="font-medium">{loan.purpose}</p>
-                  </div>
-                  <div className="flex justify-between">
-                    <p className="text-gray-600">Risk Level</p>
                     <p className="font-medium">
-                      {loan.risk === 'low' ? 'Low Risk' : loan.risk === 'medium' ? 'Medium Risk' : 'High Risk'}
+                      RM {loan.monthlyPayment || Math.round(parseFloat(loan.amount || 0) / parseInt(loan.duration || 1))}
                     </p>
                   </div>
                   <div className="flex justify-between">
-                    <p className="text-gray-600">Credit Score</p>
-                    <p className="font-medium">{loan.creditScore}</p>
+                    <p className="text-gray-600">Purpose</p>
+                    <p className="font-medium">{loan.purpose || loan.description || 'Not specified'}</p>
                   </div>
+                  {loan.risk && (
+                    <div className="flex justify-between">
+                      <p className="text-gray-600">Risk Level</p>
+                      <p className="font-medium">
+                        {loan.risk === 'low' ? 'Low Risk' : loan.risk === 'medium' ? 'Medium Risk' : 'High Risk'}
+                      </p>
+                    </div>
+                  )}
+                  {loan.creditScore && (
+                    <div className="flex justify-between">
+                      <p className="text-gray-600">Credit Score</p>
+                      <p className="font-medium">{loan.creditScore}</p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -220,17 +287,19 @@ const FundingReviewPage = () => {
             By funding this loan, you agree to:
           </p>
           <ul className="text-yellow-700 text-sm space-y-1 mb-2">
-            <li>• Transfer RM {loan.requestedAmount} to the borrower</li>
+            <li>• Transfer RM {loan.requestedAmount || loan.amount} to the borrower</li>
             <li>• Accept the proposed interest rate of {loan.proposedInterest}</li>
-            <li>• Receive monthly payments of RM {loan.monthlyPayment} for {loan.term}</li>
+            <li>• Receive monthly payments of RM {loan.monthlyPayment || Math.round(parseFloat(loan.amount || 0) / parseInt(loan.duration || 1))} for {loan.term}</li>
           </ul>
           <p className="text-yellow-700 text-sm">
-            This transaction will be recorded on the blockchain and cannot be reversed.
+            {isBlockchainLoan 
+              ? "This transaction will be permanently recorded on the Solana blockchain and cannot be reversed."
+              : "This transaction cannot be reversed once confirmed."}
           </p>
         </div>
 
         {/* Fund Now Button */}
-        {isLoading ? (
+        {isProcessing ? (
           <div className="w-full bg-secondary py-4 rounded-xl font-medium text-lg text-center text-white flex items-center justify-center">
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mr-3"></div>
             Processing Transaction...
@@ -238,9 +307,14 @@ const FundingReviewPage = () => {
         ) : (
           <button 
             onClick={handleFundNow}
-            className="w-full bg-secondary hover:bg-secondaryLight text-white py-4 rounded-xl font-medium transition-colors text-lg"
+            disabled={!connected}
+            className={`w-full py-4 rounded-xl font-medium text-lg transition-colors ${
+              connected 
+                ? "bg-secondary hover:bg-secondaryLight text-white" 
+                : "bg-gray-300 text-gray-500 cursor-not-allowed"
+            }`}
           >
-            Fund Now - RM {loan.requestedAmount}
+            {connected ? `Fund Now - RM ${loan.requestedAmount || loan.amount}` : "Connect Wallet to Fund"}
           </button>
         )}
         
@@ -252,13 +326,13 @@ const FundingReviewPage = () => {
 
         {/* Back Button */}
         <button 
-          onClick={() => navigate(`/fund/${loanId}`)}
-          className="flex items-center text-secondary font-medium mt-4 mx-auto"
+          onClick={() => navigate(-1)}
+          className="flex items-center text-blue-700 font-medium mt-5"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
-          Back
+          Back to Loan Details
         </button>
       </div>
     </HalfCircleBackground>

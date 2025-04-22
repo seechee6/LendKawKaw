@@ -25,7 +25,9 @@ import {
   UploadPayslipPage,
   OnboardingSuccessPage,
   NotFoundPage,
-  WithdrawTutorialPage
+  WithdrawTutorialPage,
+  SolanaTestPage,
+  LoanDetailPage
 } from "./pages";
 import { ThemeProvider } from "./context/ThemeContext";
 import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
@@ -66,12 +68,14 @@ const AppContent = () => {
             <Route path="/fund/:loanId" element={<LoanFundingPage />} />
             <Route path="/funding-review/:loanId" element={<FundingReviewPage />} />
             <Route path="/funding-success/:loanId" element={<LoanFundingSuccessPage />} />
+            <Route path="/loan-detail/:loanId" element={<LoanDetailPage />} />
             <Route path="/repay/:loanId" element={<LoanRepaymentPage />} />
             <Route path="/review-summary/:loanId" element={<ReviewSummaryPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/premium" element={<PremiumPage />} />
             <Route path="/lender-reports" element={<LenderReportsPage />} />
             <Route path="/withdraw-tutorial" element={<WithdrawTutorialPage />} />
+            <Route path="/solana-test" element={<SolanaTestPage />} />
             
             {/* Onboarding routes */}
             <Route path="/onboarding" element={<Navigate to="/onboarding/welcome" replace />} />

@@ -2,9 +2,31 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { HiCheckCircle } from 'react-icons/hi';
 import { HiChevronDown, HiChevronUp } from 'react-icons/hi';
 import { useNavigate } from 'react-router-dom';
+import { useConnection, useWallet } from '@solana/wallet-adapter-react';
+import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
+import { createLoanOnChain, initializeProgramDataIfNeeded, getProgramDataPDA } from '../services/solanaService';
+import { toast } from 'react-hot-toast';
+
+// Add a separate component for program initialization
+const InitializeButton = ({ onInitialize, isLoading }) => {
+  return (
+    <button 
+      onClick={onInitialize} 
+      disabled={isLoading}
+      className={`mt-2 w-full py-2 px-4 rounded-lg font-medium flex items-center justify-center ${
+        isLoading ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 text-white'
+      }`}
+    >
+      {isLoading ? 'Initializing...' : 'Initialize Blockchain Program'}
+    </button>
+  );
+};
 
 const LoanApplicationForm = () => {
   const navigate = useNavigate();
+  const { connection } = useConnection();
+  const wallet = useWallet();
+  
   // Base limits
   const BASE_MIN_LOAN = 1000;
   const BASE_MAX_LOAN = 5000;
@@ -20,6 +42,10 @@ const LoanApplicationForm = () => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false); // For loan type dropdown
   const [isGuarantorDropdownOpen, setIsGuarantorDropdownOpen] = useState(false); // For guarantor dropdown
   const [showCustomGuarantorInput, setShowCustomGuarantorInput] = useState(false); // To toggle between dropdown and custom input
+  const [isSubmitting, setIsSubmitting] = useState(false); // For handling submission state
+  const [purpose, setPurpose] = useState(''); // To store the loan purpose
+  const [isInitializing, setIsInitializing] = useState(false); // For initialization state
+  const [programInitialized, setProgramInitialized] = useState(null); // null = unknown, true = initialized, false = not initialized
   
   // Mock saved guarantors
   const [savedGuarantors] = useState([
@@ -191,30 +217,237 @@ const LoanApplicationForm = () => {
     setIsGuarantorDropdownOpen(false);
   };
 
-  // Handle apply button click
-  const handleApply = () => {
-    // Create loan data object
-    const loanData = {
-      loanAmount,
-      repaymentPeriod,
-      loanType,
-      installmentAmount,
-      guarantor: isGuarantorEnabled ? guarantorId : null,
-      guarantorName: isGuarantorEnabled && guarantorId ? getGuarantorDisplayName() : null,
-      hasGuarantor: isGuarantorEnabled && guarantorId ? true : false,
-      totalAmount: loanAmount,
-      monthlyPayment: installmentAmount,
-      term: `${repaymentPeriod} months`,
-      title: `${loanType === 'personal' ? 'Personal' : 'Business'} Loan`,
-      dueDate: calculateRepaymentDate(),
-      interest: fees,
-      protectionFee: protectionFee,
-      totalWithFees: totalLoanAmount,
-      status: isGuarantorEnabled && guarantorId ? 'pending guarantor' : 'pending'
+  // Check if program is initialized on component mount
+  useEffect(() => {
+    const checkProgramInitialized = async () => {
+      if (!wallet.connected) return;
+      
+      try {
+        const { pda } = await getProgramDataPDA();
+        const programDataAccount = await connection.getAccountInfo(pda);
+        setProgramInitialized(!!programDataAccount);
+      } catch (error) {
+        console.error("Error checking program initialization:", error);
+        setProgramInitialized(false);
+      }
     };
     
-    // Navigate to success page with loan data
-    navigate('/loan-success', { state: { loan: loanData } });
+    checkProgramInitialized();
+  }, [wallet.connected, connection]);
+  
+  // Initialize program data separately
+  const handleInitializeProgram = async () => {
+    if (!wallet.connected) {
+      toast.error("Please connect your wallet first");
+      return false;
+    }
+    
+    setIsInitializing(true);
+    const loadingToast = toast.loading("Initializing blockchain program...");
+    
+    try {
+      // Make sure we have enough SOL first
+      const balance = await connection.getBalance(wallet.publicKey);
+      const balanceInSol = balance / 1000000000; // Convert lamports to SOL
+      
+      if (balanceInSol < 0.1) {
+        toast.dismiss(loadingToast);
+        toast.error(`Your wallet has insufficient SOL (${balanceInSol.toFixed(4)} SOL). Need at least 0.1 SOL.`);
+        return false;
+      }
+      
+      // First check if it's already initialized to avoid unnecessary transactions
+      try {
+        const { pda } = await getProgramDataPDA();
+        const programDataAccount = await connection.getAccountInfo(pda);
+        
+        if (programDataAccount) {
+          toast.dismiss(loadingToast);
+          toast.success("Program is already initialized!");
+          setProgramInitialized(true);
+          return true;
+        }
+      } catch (checkError) {
+        console.error("Error checking program status:", checkError);
+      }
+      
+      // Try the initialization
+      const initResult = await initializeProgramDataIfNeeded(connection, wallet);
+      
+      // Verify the program was initialized
+      const programDataPubkey = initResult.programDataPubkey;
+      const verifyAccount = await connection.getAccountInfo(programDataPubkey);
+      
+      if (!verifyAccount) {
+        throw new Error("Program initialization transaction completed, but the account wasn't created");
+      }
+      
+      toast.dismiss(loadingToast);
+      toast.success("Program initialized successfully!");
+      setProgramInitialized(true);
+      return true;
+    } catch (error) {
+      toast.dismiss(loadingToast);
+      console.error("Error initializing program:", error);
+      
+      // Extract the most useful part of the error message
+      let errorMessage = "Unknown error occurred";
+      
+      if (error.message) {
+        // Check for specific error patterns
+        if (error.message.includes("unauthorized signer")) {
+          errorMessage = "Authorization error: The program account could not be created. Try a different wallet.";
+        } else if (error.message.includes("insufficient")) {
+          errorMessage = "Insufficient SOL in your wallet for this transaction.";
+        } else if (error.message.includes("Transaction simulation failed")) {
+          errorMessage = "Transaction simulation failed. This may be due to network congestion. Please try again.";
+        } else if (error.message.includes("timed out")) {
+          errorMessage = "Transaction timed out. The network may be congested. Please try again.";
+        } else {
+          // Get the most relevant part of the error message
+          errorMessage = error.message.split('\n')[0].slice(0, 100);
+        }
+      }
+      
+      // If we have logs, try to extract more specific error information
+      if (error.logs && Array.isArray(error.logs)) {
+        // Look for specific error messages in the logs
+        const errorLogs = error.logs.filter(log => 
+          log.includes("Error") || 
+          log.includes("error") || 
+          log.includes("failed")
+        );
+        
+        if (errorLogs.length > 0) {
+          // Use the most specific error we can find
+          const mostSpecificLog = errorLogs[errorLogs.length - 1];
+          console.log("Most specific error log:", mostSpecificLog);
+          
+          if (mostSpecificLog.includes("signer privilege escalated")) {
+            errorMessage = "Permission error: The transaction requires elevated permissions.";
+          } else if (mostSpecificLog.includes("InstructionFallbackNotFound")) {
+            errorMessage = "Contract error: The function you're trying to call doesn't exist.";
+          }
+        }
+      }
+      
+      toast.error(`Initialization failed: ${errorMessage}`);
+      setProgramInitialized(false);
+      return false;
+    } finally {
+      setIsInitializing(false);
+    }
+  };
+
+  // Handle apply button click
+  const handleApply = async () => {
+    if (!wallet.connected) {
+      toast.error("Please connect your wallet first");
+      return;
+    }
+    
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    
+    try {
+      // Basic validation
+      if (loanAmount < 0.001) {
+        toast.error("Loan amount must be at least 0.001 SOL");
+        setIsSubmitting(false);
+        return;
+      }
+      
+      if (repaymentPeriod < 1) {
+        toast.error("Repayment period must be at least 1 month");
+        setIsSubmitting(false);
+        return;
+      }
+      
+      // Create loan data object
+      const loanData = {
+        loanAmount: parseFloat(loanAmount) / 1000, // Convert to SOL (dividing by 1000 because our UI shows RM 1000 = 1 SOL)
+        repaymentPeriod: parseInt(repaymentPeriod),
+        purpose: purpose || (loanType === 'personal' ? 'Personal Loan' : 'Business Loan'),
+        installmentAmount,
+        interestRate: 6, // 6% interest rate
+        guarantor: isGuarantorEnabled ? guarantorId : null,
+        guarantorName: isGuarantorEnabled && guarantorId ? getGuarantorDisplayName() : null,
+        hasGuarantor: isGuarantorEnabled && guarantorId ? true : false,
+        totalAmount: loanAmount,
+        monthlyPayment: installmentAmount,
+        term: `${repaymentPeriod} months`,
+        title: `${loanType === 'personal' ? 'Personal' : 'Business'} Loan`,
+        dueDate: calculateRepaymentDate(),
+        interest: fees,
+        protectionFee: protectionFee,
+        totalWithFees: totalLoanAmount,
+        status: isGuarantorEnabled && guarantorId ? 'pending guarantor' : 'pending'
+      };
+      
+      // First check wallet balance
+      const balance = await connection.getBalance(wallet.publicKey);
+      const balanceInSol = balance / 1000000000; // Convert lamports to SOL
+      
+      if (balanceInSol < 0.1) {
+        toast.error(`Your wallet has insufficient SOL (${balanceInSol.toFixed(4)} SOL). Need at least 0.1 SOL.`);
+        setIsSubmitting(false);
+        return;
+      }
+      
+      // Store loan on blockchain
+      const loadingToast = toast.loading("Creating loan on blockchain...");
+      
+      try {
+        // Create the loan
+        const result = await createLoanOnChain(connection, wallet, loanData);
+        
+        toast.dismiss(loadingToast);
+        
+        if (!result || !result.signature || !result.loanPublicKey) {
+          throw new Error("Failed to create loan: missing transaction details");
+        }
+        
+        // Add blockchain information to loan data
+        loanData.signature = result.signature;
+        loanData.loanPublicKey = result.loanPublicKey;
+        
+        toast.success("Loan successfully created on blockchain!");
+        
+        // Navigate to success page with loan data
+        navigate('/loan-success', { state: { loan: loanData } });
+      } catch (blockchainError) {
+        toast.dismiss(loadingToast);
+        console.error("Blockchain error:", blockchainError);
+        
+        // If program needs initialization
+        if (blockchainError.message && blockchainError.message.includes("needs to be initialized first")) {
+          toast.error("Program needs initialization before creating a loan");
+          
+          // Ask user if they want to initialize program
+          if (window.confirm("The blockchain program needs to be set up first. Would you like to initialize it now?")) {
+            const success = await handleInitializeProgram();
+            if (success) {
+              toast("Program initialized. Please try creating your loan again.");
+            }
+          }
+        } else if (blockchainError.message && blockchainError.message.includes("insufficient funds")) {
+          toast.error(`Insufficient SOL in your wallet. Add funds and try again.`);
+        } else if (blockchainError.message && blockchainError.message.includes("unauthorized signer")) {
+          toast.error(`Permission denied. The current wallet cannot perform this action.`);
+        } else {
+          toast.error(`Transaction error: ${blockchainError.message?.slice(0, 100) || "Unknown error"}`);
+        }
+        
+        setIsSubmitting(false);
+        return;
+      }
+    } catch (error) {
+      console.error("Error applying for loan:", error);
+      toast.dismiss();
+      toast.error("Failed to create loan. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
   
   // Get guarantor display name (for UI display)
@@ -231,6 +464,22 @@ const LoanApplicationForm = () => {
       {/* Heading */}
       <h1 className="text-3xl font-bold mb-1">Apply for a</h1>
       <h1 className="text-3xl font-bold mb-8">Microloan Today.</h1>
+
+      {/* Connect wallet message */}
+      {!wallet.connected && (
+        <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-100">
+          <p className="text-blue-800 mb-3">Connect your wallet to apply for a loan</p>
+          <WalletMultiButton className="w-full flex justify-center" />
+        </div>
+      )}
+
+      {/* Program initialization message */}
+      {wallet.connected && programInitialized === false && (
+        <div className="mb-6 p-4 bg-yellow-50 rounded-lg border border-yellow-100">
+          <p className="text-yellow-800 mb-3">The loan program needs to be initialized before you can apply</p>
+          <InitializeButton onInitialize={handleInitializeProgram} isLoading={isInitializing} />
+        </div>
+      )}
 
       {/* Loan type selection */}
       <div className="mb-6">
@@ -375,6 +624,18 @@ const LoanApplicationForm = () => {
             </p>
           </div>
         )}
+      </div>
+
+      {/* Loan purpose field - NEW */}
+      <div className="mb-6">
+        <label className="block text-gray-700 mb-2">Loan Purpose</label>
+        <input
+          type="text"
+          value={purpose}
+          onChange={(e) => setPurpose(e.target.value)}
+          placeholder="What will you use this loan for?"
+          className="w-full p-3 border border-gray-300 rounded-lg"
+        />
       </div>
 
       {/* Loan amount slider */}
@@ -537,12 +798,19 @@ const LoanApplicationForm = () => {
               
               <button
                 onClick={handleApply}
-                className="mt-6 w-full bg-secondary hover:bg-secondaryLight text-white py-3 px-4 rounded-full font-medium flex items-center justify-center"
+                disabled={isSubmitting || !wallet.connected}
+                className={`mt-6 w-full py-3 px-4 rounded-full font-medium flex items-center justify-center ${
+                  isSubmitting || !wallet.connected
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-secondary hover:bg-secondaryLight text-white'
+                }`}
               >
-                Apply Now
-                <svg className="w-5 h-5 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
-                </svg>
+                {isSubmitting ? 'Processing...' : 'Apply Now'}
+                {!isSubmitting && (
+                  <svg className="w-5 h-5 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                  </svg>
+                )}
               </button>
             </div>
           ) : (
@@ -555,12 +823,19 @@ const LoanApplicationForm = () => {
               
               <button
                 onClick={handleApply}
-                className="mt-6 w-full bg-secondary hover:bg-secondaryLight text-white py-3 px-4 rounded-full font-medium flex items-center justify-center"
+                disabled={isSubmitting || !wallet.connected}
+                className={`mt-6 w-full py-3 px-4 rounded-full font-medium flex items-center justify-center ${
+                  isSubmitting || !wallet.connected
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-secondary hover:bg-secondaryLight text-white'
+                }`}
               >
-                Apply Now
-                <svg className="w-5 h-5 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
-                </svg>
+                {isSubmitting ? 'Processing...' : 'Apply Now'}
+                {!isSubmitting && (
+                  <svg className="w-5 h-5 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                  </svg>
+                )}
               </button>
             </div>
           )}

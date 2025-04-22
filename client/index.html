@@ -4,7 +4,18 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vite + React</title>
+    <title>MicroLoanChain</title>
+    <script>
+      // Fix for "process is not defined" errors
+      window.process = {
+        env: {},
+        browser: true,
+        version: '',
+        nextTick: function(fn) { setTimeout(fn, 0); }
+      };
+      // Fix for global reference errors
+      window.global = window;
+    </script>
   </head>
   <body>
     <div id="root"></div>

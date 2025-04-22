@@ -88,6 +88,10 @@ const HomePage = () => {
         navigate(`/repay/${loanId || 'all'}`);
     };
 
+    const handleViewLoanDetail = (loanId) => {
+        navigate(`/loan-detail/${loanId}`);
+    };
+
     const handleNotificationsClick = () => {
         // Navigate to notifications page in a real app
         alert('Notifications feature will open here');
@@ -160,7 +164,14 @@ const HomePage = () => {
                     {userLoans.length > 0 ? (
                         <div className="space-y-4">
                             {userLoans.map(loan => (
-                                <div key={loan.id} className="bg-white rounded-xl shadow-sm p-4">
+                                <div 
+                                    key={loan.id} 
+                                    className="bg-white rounded-xl shadow-sm p-4 cursor-pointer hover:shadow-md transition-shadow"
+                                    onClick={() => handleViewLoanDetail(loan.id)}
+                                    tabIndex="0"
+                                    onKeyDown={(e) => e.key === 'Enter' && handleViewLoanDetail(loan.id)}
+                                    aria-label={`View details for ${loan.title} loan`}
+                                >
                                     <div className="flex justify-between items-start mb-2">
                                         <div>
                                             <h3 className="text-lg font-semibold">{loan.title}</h3>
@@ -169,7 +180,10 @@ const HomePage = () => {
                                             </p>
                                         </div>
                                         <button
-                                            onClick={() => handleRepayLoan(loan.id)}
+                                            onClick={(e) => {
+                                                e.stopPropagation(); // Prevent triggering card click
+                                                handleRepayLoan(loan.id);
+                                            }}
                                             className="bg-primary hover:bg-primaryHover text-white px-5 py-2 rounded-full text-sm font-medium"
                                         >
                                             Repay

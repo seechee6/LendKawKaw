@@ -1,16 +1,13 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
-import { Buffer } from 'buffer';
-
-// Add minimal polyfills needed for Solana web3.js
-window.Buffer = Buffer;
+import { Toaster } from 'react-hot-toast';
 
 import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
 import { PhantomWalletAdapter } from '@solana/wallet-adapter-wallets';
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
 import { clusterApiUrl } from '@solana/web3.js';
-
+import { LoanProvider } from "./context/LoanContext";
 import App from "./App";
 import { TransactionsProvider } from "./context/TransactionContext";
 import "./index.css";
@@ -32,9 +29,12 @@ root.render(
   <ConnectionProvider endpoint={endpoint}>
     <WalletProvider wallets={wallets} autoConnect>
       <WalletModalProvider>
+        <LoanProvider>
         <TransactionsProvider>
           <App />
+          <Toaster position="top-center" />
         </TransactionsProvider>
+        </LoanProvider>
       </WalletModalProvider>
     </WalletProvider>
   </ConnectionProvider>

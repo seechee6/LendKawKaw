@@ -21,10 +21,10 @@ const LoanConfirmationPage = () => {
   }, [location, navigate]);
 
   const handleConfirm = async () => {
-    if (!currentAccount) {
-      alert("Please connect your wallet first");
-      return;
-    }
+    // if (!currentAccount) {
+    //   alert("Please connect your wallet first");
+    //   return;
+    // }
 
     setIsProcessing(true);
     

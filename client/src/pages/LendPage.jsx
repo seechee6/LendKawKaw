@@ -1,17 +1,17 @@
-import React, { useState, useEffect, useContext } from 'react';
-import { ethers } from 'ethers';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { TransactionContext } from '../context/TransactionContext';
-import { LoanCard, HalfCircleBackground } from '../components';
-import { FiChevronDown, FiChevronUp, FiLock, FiBarChart2 } from 'react-icons/fi';
+import { HalfCircleBackground } from '../components';
+import { FiChevronDown, FiChevronUp, FiLock, FiRefreshCw } from 'react-icons/fi';
 import { Link } from 'react-router-dom';
 import { HiOutlineEye, HiOutlineUser, HiOutlineCash, HiOutlineCalendar, HiOutlineBadgeCheck, HiOutlineChartBar, HiOutlineLightningBolt, HiOutlineSparkles } from 'react-icons/hi';
-import { useWallet } from '@solana/wallet-adapter-react';
+import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
+import { fetchAvailableLoansFromChain } from '../services/solanaService';
+import { toast } from 'react-hot-toast';
 
 const LendPage = () => {
-  // const { currentAccount, connectWallet } = useContext(TransactionContext);
-  const { publicKey } = useWallet()
+  const { publicKey } = useWallet();
+  const { connection } = useConnection();
   const navigate = useNavigate();
   const [loanApplications, setLoanApplications] = useState([]);
   const [filter, setFilter] = useState('all'); // 'all', 'low-risk', 'low-amount'
@@ -19,190 +19,178 @@ const LendPage = () => {
   const [expandedCards, setExpandedCards] = useState({});
   const [showingInsights, setShowingInsights] = useState({});
   const [isPremium] = useState(true); // In a real app, this would come from a context or API
+  const [showMockData, setShowMockData] = useState(true);
   
   useEffect(() => {
-    // Simulate fetching loan applications from blockchain
-    const fetchLoanApplications = async () => {
-      setIsLoading(true);
-      try {
-        // In a real app, this would fetch from your smart contract
-        setTimeout(() => {
-          const mockApplications = [
-            {
-              id: '1',
-              title: 'Small Business Loan',
-              borrower: '0x7e...1A3b',
-              requestDate: 'Mar 19, 2024',
-              requestedAmount: '45,000',
-              monthlyPayment: '5,000',
-              purpose: 'Business Expansion',
-              proposedInterest: '6.5%',
-              term: '12 months',
-              risk: 'low',
-              collateralOffered: 'Business Equipment',
-              creditScore: '720',
-              status: 'pending',
-              // Premium insights data for the flip card
-              riskScore: 28,
-              onTimePayment: 97,
-              previousLoans: 3,
-              estimatedROI: 6.5,
-              // Original premium insights
-              premiumInsights: {
-                borrowerRepaymentRate: 97, // percentage of on-time payments
-                latePaymentFrequency: 2.5, // percentage of late payments
-                defaultRisk: 'Very Low', // calculated risk of default
-                similarLoansPerformance: 98.2, // percentage of similar loans that performed well
-                borrowerHistory: [
-                  { amount: '12,000', status: 'Completed', onTime: true },
-                  { amount: '8,500', status: 'Completed', onTime: true },
-                  { amount: '5,000', status: 'Completed', onTime: false }
-                ]
-              }
-            },
-            {
-              id: '2',
-              title: 'Education Loan',
-              borrower: '0x3D...F28c',
-              requestDate: 'Mar 18, 2024',
-              requestedAmount: '45,000',
-              monthlyPayment: '5,000',
-              purpose: 'University Tuition',
-              proposedInterest: '6.5%',
-              term: '24 months',
-              risk: 'low',
-              collateralOffered: 'None',
-              creditScore: '750',
-              status: 'pending',
-              // Premium insights data for the flip card
-              riskScore: 15,
-              onTimePayment: 100,
-              previousLoans: 2,
-              estimatedROI: 6.5,
-              premiumInsights: {
-                borrowerRepaymentRate: 100,
-                latePaymentFrequency: 0,
-                defaultRisk: 'Minimal',
-                similarLoansPerformance: 99.5,
-                borrowerHistory: [
-                  { amount: '10,000', status: 'Completed', onTime: true },
-                  { amount: '15,000', status: 'Completed', onTime: true }
-                ]
-              }
-            },
-            {
-              id: '3',
-              title: 'Home Improvement',
-              borrower: '0x9A...B45d',
-              requestDate: 'Mar 17, 2024',
-              requestedAmount: '45,000',
-              monthlyPayment: '5,000',
-              purpose: 'Kitchen Renovation',
-              proposedInterest: '6.5%',
-              term: '6 months',
-              risk: 'high',
-              collateralOffered: 'Property Lien',
-              creditScore: '680',
-              status: 'pending',
-              // Premium insights data for the flip card
-              riskScore: 65,
-              onTimePayment: 86,
-              previousLoans: 3,
-              estimatedROI: 6.5,
-              premiumInsights: {
-                borrowerRepaymentRate: 86,
-                latePaymentFrequency: 12,
-                defaultRisk: 'Moderate',
-                similarLoansPerformance: 90.1,
-                borrowerHistory: [
-                  { amount: '20,000', status: 'Completed', onTime: false },
-                  { amount: '7,500', status: 'Defaulted', onTime: false },
-                  { amount: '12,000', status: 'Completed', onTime: true }
-                ]
-              }
-            },
-            {
-              id: '4',
-              title: 'Medical Expenses',
-              borrower: '0x5C...D31e',
-              requestDate: 'Mar 16, 2024',
-              requestedAmount: '12,000',
-              monthlyPayment: '2,000',
-              purpose: 'Surgery Costs',
-              proposedInterest: '6.5%',
-              term: '6 months',
-              risk: 'medium',
-              collateralOffered: 'None',
-              creditScore: '700',
-              status: 'pending',
-              // Premium insights data for the flip card
-              riskScore: 42,
-              onTimePayment: 92,
-              previousLoans: 2,
-              estimatedROI: 6.5,
-              premiumInsights: {
-                borrowerRepaymentRate: 92,
-                latePaymentFrequency: 5,
-                defaultRisk: 'Low',
-                similarLoansPerformance: 94.3,
-                borrowerHistory: [
-                  { amount: '9,000', status: 'Completed', onTime: true },
-                  { amount: '6,000', status: 'Completed', onTime: false }
-                ]
-              }
-            },
-            {
-              id: '5',
-              title: 'Startup Funding',
-              borrower: '0x2F...A87b',
-              requestDate: 'Mar 15, 2024',
-              requestedAmount: '75,000',
-              monthlyPayment: '6,250',
-              purpose: 'Initial Inventory',
-              proposedInterest: '6.5%',
-              term: '12 months',
-              risk: 'high',
-              collateralOffered: 'Inventory',
-              creditScore: '690',
-              status: 'pending',
-              // Premium insights data for the flip card
-              riskScore: 78,
-              onTimePayment: 82,
-              previousLoans: 2,
-              estimatedROI: 6.5,
-              premiumInsights: {
-                borrowerRepaymentRate: 82,
-                latePaymentFrequency: 15,
-                defaultRisk: 'High',
-                similarLoansPerformance: 85.0,
-                borrowerHistory: [
-                  { amount: '50,000', status: 'Active', onTime: true },
-                  { amount: '25,000', status: 'Late', onTime: false }
-                ]
-              }
-            }
-          ];
-          
-          setLoanApplications(mockApplications);
-          setIsLoading(false);
-        }, 1000);
-      } catch (error) {
-        console.error("Error fetching loan applications:", error);
-        setIsLoading(false);
-      }
-    };
-
     fetchLoanApplications();
-  }, []);
+  }, [connection, showMockData]);
+
+  const fetchLoanApplications = async () => {
+    setIsLoading(true);
+    try {
+      let loans = [];
+      
+      // Try to fetch blockchain loans if connection is available
+      if (connection) {
+        try {
+          const blockchainLoans = await fetchAvailableLoansFromChain(connection);
+          console.log("Blockchain loans:", blockchainLoans);
+          
+          // Transform blockchain loan data to match our UI format
+          loans = blockchainLoans.map(loan => ({
+            id: loan.id,
+            publicKey: loan.publicKey, // We'll need this to fund the loan
+            title: loan.description || 'Loan Application',
+            borrower: loan.borrower,
+            requestDate: new Date().toLocaleDateString(), // Blockchain doesn't have this info
+            requestedAmount: loan.amount,
+            monthlyPayment: (parseFloat(loan.amount) / parseInt(loan.duration)).toFixed(2),
+            purpose: loan.description,
+            proposedInterest: `${loan.interestRate}%`,
+            term: `${loan.duration} months`,
+            risk: calculateRiskLevel(loan.interestRate),
+            creditScore: '---', // Not available from blockchain
+            status: 'pending',
+            // Simulated premium insights
+            riskScore: calculateRiskScore(loan.interestRate),
+            onTimePayment: 95,
+            previousLoans: 1,
+            estimatedROI: parseFloat(loan.interestRate),
+            isBlockchainLoan: true
+          }));
+        } catch (error) {
+          console.error("Error fetching blockchain loans:", error);
+          toast.error("Failed to fetch blockchain loans");
+        }
+      }
+      
+      // Add mock data if enabled
+      if (showMockData) {
+        const mockLoans = [
+          {
+            id: 'mock-1',
+            title: 'Small Business Loan',
+            borrower: '0x7e...1A3b',
+            requestDate: 'Mar 19, 2024',
+            requestedAmount: '45,000',
+            monthlyPayment: '5,000',
+            purpose: 'Business Expansion',
+            proposedInterest: '6.5%',
+            term: '12 months',
+            risk: 'low',
+            collateralOffered: 'Business Equipment',
+            creditScore: '720',
+            status: 'pending',
+            riskScore: 28,
+            onTimePayment: 97,
+            previousLoans: 3,
+            estimatedROI: 6.5,
+            premiumInsights: {
+              borrowerRepaymentRate: 97,
+              latePaymentFrequency: 2.5,
+              defaultRisk: 'Very Low',
+              similarLoansPerformance: 98.2,
+              borrowerHistory: [
+                { amount: '12,000', status: 'Completed', onTime: true },
+                { amount: '8,500', status: 'Completed', onTime: true },
+                { amount: '5,000', status: 'Completed', onTime: false }
+              ]
+            }
+          },
+          {
+            id: 'mock-2',
+            title: 'Education Loan',
+            borrower: '0x3D...F28c',
+            requestDate: 'Mar 18, 2024',
+            requestedAmount: '45,000',
+            monthlyPayment: '5,000',
+            purpose: 'University Tuition',
+            proposedInterest: '6.5%',
+            term: '24 months',
+            risk: 'low',
+            collateralOffered: 'None',
+            creditScore: '750',
+            status: 'pending',
+            riskScore: 15,
+            onTimePayment: 100,
+            previousLoans: 2,
+            estimatedROI: 6.5,
+            premiumInsights: {
+              borrowerRepaymentRate: 100,
+              latePaymentFrequency: 0,
+              defaultRisk: 'Minimal',
+              similarLoansPerformance: 99.5,
+              borrowerHistory: [
+                { amount: '10,000', status: 'Completed', onTime: true },
+                { amount: '15,000', status: 'Completed', onTime: true }
+              ]
+            }
+          },
+          {
+            id: 'mock-3',
+            title: 'Home Improvement',
+            borrower: '0x9A...B45d',
+            requestDate: 'Mar 17, 2024',
+            requestedAmount: '45,000',
+            monthlyPayment: '5,000',
+            purpose: 'Kitchen Renovation',
+            proposedInterest: '6.5%',
+            term: '6 months',
+            risk: 'high',
+            collateralOffered: 'Property Lien',
+            creditScore: '680',
+            status: 'pending',
+            riskScore: 65,
+            onTimePayment: 86,
+            previousLoans: 3,
+            estimatedROI: 6.5
+          }
+        ];
+        
+        loans = [...loans, ...mockLoans];
+      }
+      
+      setLoanApplications(loans);
+    } catch (error) {
+      console.error("Error fetching loan applications:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Helper functions to calculate risk levels
+  const calculateRiskLevel = (interestRate) => {
+    const rate = parseFloat(interestRate);
+    if (rate <= 5) return 'low';
+    if (rate <= 8) return 'medium';
+    return 'high';
+  };
+  
+  const calculateRiskScore = (interestRate) => {
+    const rate = parseFloat(interestRate);
+    return Math.min(Math.round(rate * 10), 100);
+  };
 
   const handleFund = (loan) => {
     if (!publicKey) {
-      alert("Please connect your wallet first");
+      toast.error("Please connect your wallet first");
       return;
     }
     
-    // Navigate to our new funding page with loan data
-    navigate(`/fund/${loan.id}`, { state: { loan } });
+    // For blockchain loans, pass the loan public key
+    if (loan.publicKey) {
+      navigate(`/fund/${loan.id}`, { 
+        state: { 
+          loan,
+          isBlockchainLoan: true,
+          loanPublicKey: loan.publicKey,
+          borrowerPublicKey: loan.borrower
+        }
+      });
+    } else {
+      // For mock loans, pass the loan data as before
+      navigate(`/fund/${loan.id}`, { state: { loan } });
+    }
   };
 
   const toggleCardExpand = (id) => {
@@ -218,6 +206,10 @@ const LendPage = () => {
       [id]: !prev[id]
     }));
   };
+  
+  const toggleMockData = () => {
+    setShowMockData(!showMockData);
+  };
 
   const filteredApplications = loanApplications.filter(loan => {
     if (filter === 'all') return true;
@@ -225,7 +217,15 @@ const LendPage = () => {
     return true;
   }).sort((a, b) => {
     if (filter === 'low-amount') {
-      return parseInt(a.requestedAmount.replace(/,/g, '')) - parseInt(b.requestedAmount.replace(/,/g, ''));
+      // Handle different formats for amount
+      const getAmount = (loan) => {
+        if (typeof loan.requestedAmount === 'string' && loan.requestedAmount.includes(',')) {
+          return parseInt(loan.requestedAmount.replace(/,/g, ''));
+        }
+        return parseFloat(loan.requestedAmount || 0);
+      };
+      
+      return getAmount(a) - getAmount(b);
     }
     return 0;
   });
@@ -239,44 +239,65 @@ const LendPage = () => {
           <div className="bg-white rounded-xl shadow-md p-6 mb-6 text-center">
             <p className="mb-4">Connect your wallet to start lending</p>
             <WalletMultiButton/>
-              <p className="text-white text-base font-semibold">
-                Connect Wallet
-              </p>
-            
           </div>
         ) : (
           <>
-            <div className="flex space-x-2 mb-4 overflow-x-auto py-2">
-              <button 
-                className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap ${filter === 'all' ? 'bg-secondary text-white' : 'bg-white text-gray-700'}`}
-                onClick={() => setFilter('all')}
-              >
-                All Applications
-              </button>
-              <button 
-                className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap ${filter === 'low-risk' ? 'bg-secondary text-white' : 'bg-white text-gray-700'}`}
-                onClick={() => setFilter('low-risk')}
-              >
-                Low Risk
-              </button>
-              <button 
-                className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap ${filter === 'low-amount' ? 'bg-secondary text-white' : 'bg-white text-gray-700'}`}
-                onClick={() => setFilter('low-amount')}
-              >
-                Low Amount
-              </button>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 mb-4">
+              <div className="flex space-x-2 overflow-x-auto py-2 scrollbar-hide w-full sm:w-auto">
+                <button 
+                  className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap shadow-sm ${filter === 'all' ? 'bg-secondary text-white' : 'bg-white text-gray-700 hover:bg-gray-100'}`}
+                  onClick={() => setFilter('all')}
+                >
+                  All Applications
+                </button>
+                <button 
+                  className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap shadow-sm ${filter === 'low-risk' ? 'bg-secondary text-white' : 'bg-white text-gray-700 hover:bg-gray-100'}`}
+                  onClick={() => setFilter('low-risk')}
+                >
+                  Low Risk
+                </button>
+                <button 
+                  className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap shadow-sm ${filter === 'low-amount' ? 'bg-secondary text-white' : 'bg-white text-gray-700 hover:bg-gray-100'}`}
+                  onClick={() => setFilter('low-amount')}
+                >
+                  Low Amount
+                </button>
+              </div>
+              <div className="flex space-x-2 w-full sm:w-auto justify-end">
+                <button
+                  onClick={toggleMockData}
+                  className="px-3 py-1.5 rounded-full text-xs font-medium bg-white shadow-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                >
+                  {showMockData ? "Hide Mock" : "Show Mock"}
+                </button>
+                <button
+                  onClick={fetchLoanApplications}
+                  className="flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-white shadow-sm text-gray-700 hover:bg-gray-100"
+                >
+                  <FiRefreshCw size={14} className="mr-1" /> Refresh
+                </button>
+              </div>
             </div>
 
             {isLoading ? (
               <div className="flex justify-center py-10">
                 <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-secondary"></div>
               </div>
+            ) : filteredApplications.length === 0 ? (
+              <div className="bg-white rounded-xl shadow-md p-6 text-center">
+                <p>No loan applications available at the moment.</p>
+              </div>
             ) : (
               <div className="mt-6 space-y-4">
                 {filteredApplications.map((loan, index) => (
                   <div key={loan.id} className="relative">
                     {/* Card container */}
-                    <div className="bg-white rounded-xl shadow-sm mb-4">
+                    <div className="bg-white rounded-xl shadow-sm mb-4 relative">
+                      {loan.isBlockchainLoan && (
+                        <div className="absolute top-2 right-2 bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full z-10">
+                          On-Chain
+                        </div>
+                      )}
                       
                       {!showingInsights[loan.id] ? (
                         // Front of card - Main loan details
@@ -376,9 +397,16 @@ const LendPage = () => {
                                 </div>
                                 <div>
                                   <p className="text-sm text-gray-500">Credit Score</p>
-                                  <p className="text-md font-medium text-gray-700">{loan.creditScore}</p>
+                                  <p className="text-md font-medium text-gray-700">{loan.creditScore || 'Not Available'}</p>
                                 </div>
                               </div>
+                              
+                              {loan.isBlockchainLoan && (
+                                <div className="mt-2 text-xs text-gray-500">
+                                  <p>Loan ID: {loan.id}</p>
+                                  <p className="truncate">Borrower: {loan.borrower}</p>
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
@@ -436,6 +464,13 @@ const LendPage = () => {
                               </div>
                               <span className="font-medium text-green-600">{loan.estimatedROI || (loan.interestRate - 2)}%</span>
                             </div>
+                            
+                            {loan.isBlockchainLoan && (
+                              <div className="mt-2 bg-blue-50 p-2 rounded-md text-sm text-blue-700">
+                                <p className="font-medium">On-Chain Loan</p>
+                                <p className="text-xs">When you fund this loan, the transaction will be recorded on the Solana blockchain.</p>
+                              </div>
+                            )}
                           </div>
                         </div>
                       )}

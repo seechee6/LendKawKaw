@@ -25,7 +25,8 @@ const navItems = [
   { title: "Lend", path: "/lend" },
   { title: "Transactions", path: "/transactions" },
   //{ title: "Onboarding", path: "/onboarding" },
-  { title: "Profile", path: "/profile" }
+  { title: "Profile", path: "/profile" },
+  { title: "Solana Test", path: "/solana-test" }
 ];
 
 const Navbar = () => {

@@ -1,0 +1,363 @@
+{
+    "metadata": {
+        "address": "9euLSxzKoMvpQb5N7GjjvLrb6XurpuiJsk7jZ4mHUvhb"
+    },
+    "version": "0.1.0",
+    "name": "microloan_transactions",
+    "instructions": [
+        {
+            "name": "initialize",
+            "accounts": [
+                {
+                    "name": "user",
+                    "isMut": true,
+                    "isSigner": false
+                },
+                {
+                    "name": "authority",
+                    "isMut": true,
+                    "isSigner": true
+                },
+                {
+                    "name": "systemProgram",
+                    "isMut": false,
+                    "isSigner": false
+                }
+            ],
+            "args": []
+        },
+        {
+            "name": "createLoan",
+            "accounts": [
+                {
+                    "name": "user",
+                    "isMut": true,
+                    "isSigner": false
+                },
+                {
+                    "name": "loan",
+                    "isMut": true,
+                    "isSigner": false
+                },
+                {
+                    "name": "borrower",
+                    "isMut": true,
+                    "isSigner": true
+                },
+                {
+                    "name": "systemProgram",
+                    "isMut": false,
+                    "isSigner": false
+                }
+            ],
+            "args": [
+                {
+                    "name": "amount",
+                    "type": "u64"
+                },
+                {
+                    "name": "interestRate",
+                    "type": "u16"
+                },
+                {
+                    "name": "duration",
+                    "type": "u64"
+                }
+            ]
+        },
+        {
+            "name": "fundLoan",
+            "accounts": [
+                {
+                    "name": "lender",
+                    "isMut": true,
+                    "isSigner": true
+                },
+                {
+                    "name": "borrower",
+                    "isMut": true,
+                    "isSigner": false
+                },
+                {
+                    "name": "loan",
+                    "isMut": true,
+                    "isSigner": false
+                },
+                {
+                    "name": "systemProgram",
+                    "isMut": false,
+                    "isSigner": false
+                },
+                {
+                    "name": "clock",
+                    "isMut": false,
+                    "isSigner": false
+                }
+            ],
+            "args": [
+                {
+                    "name": "amount",
+                    "type": "u64"
+                }
+            ]
+        },
+        {
+            "name": "repayLoan",
+            "accounts": [
+                {
+                    "name": "loan",
+                    "isMut": true,
+                    "isSigner": false
+                },
+                {
+                    "name": "borrower",
+                    "isMut": true,
+                    "isSigner": true
+                },
+                {
+                    "name": "lender",
+                    "isMut": true,
+                    "isSigner": false
+                },
+                {
+                    "name": "platformAccount",
+                    "isMut": true,
+                    "isSigner": false
+                },
+                {
+                    "name": "user",
+                    "isMut": true,
+                    "isSigner": false
+                },
+                {
+                    "name": "systemProgram",
+                    "isMut": false,
+                    "isSigner": false
+                },
+                {
+                    "name": "clock",
+                    "isMut": false,
+                    "isSigner": false
+                }
+            ],
+            "args": [
+                {
+                    "name": "amount",
+                    "type": "u64"
+                },
+                {
+                    "name": "isPlatformFee",
+                    "type": "bool"
+                }
+            ]
+        }
+    ],
+    "accounts": [
+        {
+            "name": "User",
+            "type": {
+                "kind": "struct",
+                "fields": [
+                    {
+                        "name": "authority",
+                        "type": "publicKey"
+                    },
+                    {
+                        "name": "creditScore",
+                        "type": "i64"
+                    },
+                    {
+                        "name": "loansTaken",
+                        "type": "u64"
+                    },
+                    {
+                        "name": "loansRepaid",
+                        "type": "u32"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "Loan",
+            "type": {
+                "kind": "struct",
+                "fields": [
+                    {
+                        "name": "id",
+                        "type": "u64"
+                    },
+                    {
+                        "name": "borrower",
+                        "type": "publicKey"
+                    },
+                    {
+                        "name": "lender",
+                        "type": "publicKey"
+                    },
+                    {
+                        "name": "amount",
+                        "type": "u64"
+                    },
+                    {
+                        "name": "interestRate",
+                        "type": "u16"
+                    },
+                    {
+                        "name": "duration",
+                        "type": "u64"
+                    },
+                    {
+                        "name": "startDate",
+                        "type": "u64"
+                    },
+                    {
+                        "name": "totalRepaid",
+                        "type": "u64"
+                    },
+                    {
+                        "name": "isActive",
+                        "type": "bool"
+                    },
+                    {
+                        "name": "isCompleted",
+                        "type": "bool"
+                    }
+                ]
+            }
+        }
+    ],
+    "events": [
+        {
+            "name": "LoanCreatedEvent",
+            "fields": [
+                {
+                    "name": "loanId",
+                    "type": "u64",
+                    "index": false
+                },
+                {
+                    "name": "borrower",
+                    "type": "publicKey",
+                    "index": false
+                },
+                {
+                    "name": "amount",
+                    "type": "u64",
+                    "index": false
+                },
+                {
+                    "name": "interestRate",
+                    "type": "u16",
+                    "index": false
+                }
+            ]
+        },
+        {
+            "name": "LoanFundedEvent",
+            "fields": [
+                {
+                    "name": "loanId",
+                    "type": "u64",
+                    "index": false
+                },
+                {
+                    "name": "lender",
+                    "type": "publicKey",
+                    "index": false
+                },
+                {
+                    "name": "timestamp",
+                    "type": "i64",
+                    "index": false
+                }
+            ]
+        },
+        {
+            "name": "RepaymentEvent",
+            "fields": [
+                {
+                    "name": "loanId",
+                    "type": "u64",
+                    "index": false
+                },
+                {
+                    "name": "borrower",
+                    "type": "publicKey",
+                    "index": false
+                },
+                {
+                    "name": "amount",
+                    "type": "u64",
+                    "index": false
+                },
+                {
+                    "name": "timestamp",
+                    "type": "i64",
+                    "index": false
+                },
+                {
+                    "name": "isPlatformFee",
+                    "type": "bool",
+                    "index": false
+                }
+            ]
+        },
+        {
+            "name": "TransactionEvent",
+            "fields": [
+                {
+                    "name": "txType",
+                    "type": "string",
+                    "index": false
+                },
+                {
+                    "name": "user",
+                    "type": "publicKey",
+                    "index": false
+                },
+                {
+                    "name": "loanId",
+                    "type": "u64",
+                    "index": false
+                },
+                {
+                    "name": "amount",
+                    "type": "u64",
+                    "index": false
+                },
+                {
+                    "name": "timestamp",
+                    "type": "i64",
+                    "index": false
+                }
+            ]
+        }
+    ],
+    "errors": [
+        {
+            "code": 6000,
+            "name": "LoanAlreadyActive",
+            "msg": "Loan is already active"
+        },
+        {
+            "code": 6001,
+            "name": "CannotFundOwnLoan",
+            "msg": "Cannot fund your own loan"
+        },
+        {
+            "code": 6002,
+            "name": "IncorrectAmount",
+            "msg": "Incorrect amount"
+        },
+        {
+            "code": 6003,
+            "name": "LoanNotActive",
+            "msg": "Loan is not active"
+        },
+        {
+            "code": 6004,
+            "name": "LoanAlreadyCompleted",
+            "msg": "Loan is already completed"
+        }
+    ]
+}

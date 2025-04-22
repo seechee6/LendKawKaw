@@ -10,6 +10,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@coral-xyz/anchor": "^0.31.0",
+    "@project-serum/anchor": "^0.26.0",
+    "@solana/spl-token": "^0.4.13",
     "@solana/wallet-adapter-base": "^0.9.24",
     "@solana/wallet-adapter-react": "^0.15.36",
     "@solana/wallet-adapter-react-ui": "^0.9.36",
@@ -21,6 +24,7 @@
     "highcharts-react-official": "^3.2.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-hot-toast": "^2.5.2",
     "react-icons": "^5.3.0",
     "react-router-dom": "^7.3.0"
   },
@@ -29,14 +33,22 @@
     "@types/react": "^18.3.10",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.2",
+    "assert": "^2.1.0",
     "autoprefixer": "^10.4.20",
+    "browserify-zlib": "^0.2.0",
+    "buffer": "^6.0.3",
     "eslint": "^9.11.1",
     "eslint-plugin-react": "^7.37.0",
     "eslint-plugin-react-hooks": "^5.1.0-rc.0",
     "eslint-plugin-react-refresh": "^0.4.12",
     "globals": "^15.9.0",
+    "path-browserify": "^1.0.1",
     "postcss": "^8.4.47",
+    "process": "^0.11.10",
+    "stream-browserify": "^3.0.0",
     "tailwindcss": "^3.4.14",
-    "vite": "^5.4.8"
+    "util": "^0.12.5",
+    "vite": "^5.4.8",
+    "vite-plugin-node-polyfills": "^0.23.0"
   }
 }

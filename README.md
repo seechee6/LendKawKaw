@@ -157,6 +157,87 @@ cd ../smart_contract && npx hardhat run scripts/deploy.js --network localhost
 </div>
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
+# MicroLoanChain
+
+A blockchain-powered microloan platform that facilitates trust, minimizes operational costs, and ensures fair access to financial services for underserved populations.
+
+## Features
+
+- Apply for microloans with customizable terms
+- Store loan terms on Solana blockchain for transparency and security
+- Browse and fund available loans
+- Manage loan repayments
+- Credit score system for borrowers
+
+## Blockchain Integration
+
+The platform uses Solana blockchain to store and retrieve loan terms, ensuring transparency and immutability of loan agreements. The blockchain integration includes:
+
+1. **Storing Loan Terms**: When a borrower applies for a loan, the terms are stored on the Solana blockchain, including:
+   - Loan amount
+   - Interest rate
+   - Repayment period
+   - Purpose of the loan
+
+2. **Retrieving Loan Terms**: On the lending page, available loans are fetched from the blockchain, allowing lenders to see the exact terms they'll be funding.
+
+3. **Funding on Blockchain**: When a lender agrees to fund a loan, the transaction is executed on the blockchain, transferring funds to the borrower and updating the loan status.
+
+## Technical Implementation
+
+The project uses:
+
+- Solana blockchain for storing loan terms and handling transactions
+- Phantom wallet for connecting to the Solana network
+- Anchor framework for Solana program interactions
+- React + Next.js for the frontend
+- TailwindCSS for styling
+
+## Getting Started
+
+1. Clone the repository:
+```
+git clone <repository-url>
+```
+
+2. Install dependencies:
+```
+cd MicroLoanChain/client
+npm install
+```
+
+3. Set up environment variables:
+Create a `.env` file in the client directory with:
+```
+VITE_PROGRAM_ID=Transactions11111111111111111111111111111111
+VITE_RECEIVER_ADDRESS=<your-platform-wallet-address>
+```
+
+4. Run the development server:
+```
+npm run dev
+```
+
+## How to Use
+
+1. Connect your Phantom wallet
+2. Apply for a loan as a borrower or browse available loans as a lender
+3. Fund loans that meet your criteria
+4. Track repayments and loan status
+
+## Smart Contract
+
+The Solana smart contract handles:
+- Creating loan accounts
+- Funding loans
+- Processing repayments
+- Managing defaults
+- Updating borrower credit scores
+
+## License
+
+[MIT](LICENSE)
+
 
 
 

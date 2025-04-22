@@ -19,7 +19,7 @@ const ActionButtons = ({ onRepay, onRequest }) => {
       </button>
       <button 
         onClick={onRequest}
-        className="bg-primary hover:bg-secondaryLight text-white py-3 px-4 rounded-full font-medium"
+        className="bg-secondary hover:bg-secondaryLight text-white py-3 px-4 rounded-full font-medium"
       >
         Request Loan
       </button>

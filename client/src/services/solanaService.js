@@ -11,9 +11,8 @@ import { Program, AnchorProvider, web3 } from '@project-serum/anchor';
 import BN from 'bn.js';
 import idl from '../idl/idl.json';
 
-// IMPORTANT: Use the actual deployed program ID directly
-// This is the program ID on devnet that's actually deployed
-const programID = new PublicKey("9euLSxzKoMvpQb5N7GjjvLrb6XurpuiJsk7jZ4mHUvhb");
+// Use program ID from environment variable
+const programID = new PublicKey(import.meta.env.VITE_PROGRAM_ID || "DAyqZYocAeQd8ApqkoyYQuLG8dcYv3JDwehxbaxmwZ1n");
 
 console.log("Using Solana Program ID:", programID.toString());
 
@@ -484,4 +483,36 @@ export const initializeProgramDataIfNeeded = async (connection, wallet) => {
     
     throw error;
   }
+};
+
+/**
+ * Get Program instance for external services
+ * @param {object} connection - Solana connection
+ * @param {object} wallet - Optional wallet for signing transactions
+ * @returns {object|null} - Program instance or null
+ */
+export const getProgramInstance = (connection, wallet = null) => {
+  let provider;
+  
+  if (wallet) {
+    // Create provider with wallet for transaction signing
+    provider = new AnchorProvider(
+      connection,
+      wallet,
+      { preflightCommitment: 'confirmed' }
+    );
+  } else {
+    // Create read-only provider without wallet
+    provider = new AnchorProvider(
+      connection, 
+      {
+        publicKey: PublicKey.default,
+        signTransaction: () => Promise.reject(new Error("Read-only")),
+        signAllTransactions: () => Promise.reject(new Error("Read-only")),
+      },
+      { preflightCommitment: 'confirmed' }
+    );
+  }
+  
+  return new Program(idl, programID, provider);
 }; 

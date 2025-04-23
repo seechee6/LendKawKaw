@@ -49,7 +49,7 @@ const colors = {
   }
 };
 
-const programID = new PublicKey('9euLSxzKoMvpQb5N7GjjvLrb6XurpuiJsk7jZ4mHUvhb');
+const programID = new PublicKey(import.meta.env.VITE_PROGRAM_ID || "DAyqZYocAeQd8ApqkoyYQuLG8dcYv3JDwehxbaxmwZ1n");
 
 const SolanaTestPage = () => {
   const { connection } = useConnection();
@@ -839,7 +839,7 @@ const SolanaTestPage = () => {
     
     try {
       // Get program ID
-      const programId = new PublicKey('9euLSxzKoMvpQb5N7GjjvLrb6XurpuiJsk7jZ4mHUvhb');
+      const programId = new PublicKey(import.meta.env.VITE_PROGRAM_ID || "DAyqZYocAeQd8ApqkoyYQuLG8dcYv3JDwehxbaxmwZ1n");
       
       // Limit the number of signatures we fetch to avoid rate limiting
       const signatures = await connection.getSignaturesForAddress(
@@ -1071,6 +1071,20 @@ const SolanaTestPage = () => {
       fetchUserActiveLoans();
     }
   }, [userAccount]);
+
+  const listenToEvents = async () => {
+    try {
+      if (!connection || !wallet.connected) return;
+      console.log("Setting up event listener");
+      
+      const programId = new PublicKey(import.meta.env.VITE_PROGRAM_ID || "DAyqZYocAeQd8ApqkoyYQuLG8dcYv3JDwehxbaxmwZ1n");
+      
+      // Setup listener for transactions to our program
+      // ... existing code ...
+    } catch (error) {
+      console.error('Error setting up event listener:', error);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-indigo-50 to-white py-12 px-4 sm:px-6">

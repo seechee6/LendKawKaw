@@ -16,12 +16,15 @@ import NotFoundPage from "./NotFoundPage";
 import WithdrawTutorialPage from "./WithdrawTutorialPage";
 import SolanaTestPage from "./SolanaTestPage";
 import LoanDetailPage from "./LoanDetailPage";
+import CreditScorePage from "./CreditScorePage";
+import SmsTestPage from "./SmsTestPage";
 
 // Onboarding Pages
 import OnboardingWelcome from "./OnboardingWelcome";
 import PersonalInfoPage from "./PersonalInfoPage";
 import JobInfoPage from "./JobInfoPage";
 import UploadIDPage from "./UploadIDPage";
+import IDReviewPage from "./IDReviewPage";
 import SelfiePage from "./SelfiePage";
 import UploadPayslipPage from "./UploadPayslipPage";
 import OnboardingSuccessPage from "./OnboardingSuccessPage";
@@ -46,11 +49,14 @@ export {
   PersonalInfoPage,
   JobInfoPage,
   UploadIDPage,
+  IDReviewPage,
   SelfiePage,
   UploadPayslipPage,
   OnboardingSuccessPage,
   WithdrawTutorialPage,
   SolanaTestPage,
   LoanDetailPage,
+  CreditScorePage,
+  SmsTestPage,
 };
 

@@ -19,7 +19,7 @@ export const translations = {
     more: 'More',
 
     // Summary Section
-    loanSummary: 'Loan Summary',
+    loanSummary: '',
     repaymentHistory: 'Repayment History',
     excellent: 'Excellent',
     activeLoans: 'Active Loans',

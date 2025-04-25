@@ -1,16 +1,16 @@
 use anchor_lang::prelude::*;
 use solana_program::system_instruction;
 
-declare_id!("9euLSxzKoMvpQb5N7GjjvLrb6XurpuiJsk7jZ4mHUvhb");
+declare_id!("DAyqZYocAeQd8ApqkoyYQuLG8dcYv3JDwehxbaxmwZ1n");
 
 #[program]
 pub mod microloan_transactions {
     use super::*;
 
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
-        let user = &mut ctx.accounts.user;
-        user.authority = ctx.accounts.authority.key();
-        user.credit_score = 0;
+            let user = &mut ctx.accounts.user;
+            user.authority = ctx.accounts.authority.key();
+            user.credit_score = 0;
         user.loans_taken = 0;
         user.loans_repaid = 0;
         Ok(())
@@ -58,13 +58,11 @@ pub mod microloan_transactions {
     }
 
     pub fn fund_loan(ctx: Context<FundLoan>, amount: u64) -> Result<()> {
-        // Verify the transfer amount matches loan amount
         require!(
             amount == ctx.accounts.loan.amount,
             MicroLoanError::IncorrectAmount
         );
 
-        // Perform SOL transfer
         let transfer_instruction = solana_program::system_instruction::transfer(
             ctx.accounts.lender.key,
             ctx.accounts.borrower.key,
@@ -80,7 +78,6 @@ pub mod microloan_transactions {
             ],
         )?;
 
-        // Update loan state
         let loan = &mut ctx.accounts.loan;
         loan.lender = ctx.accounts.lender.key();
         loan.is_active = true;
@@ -92,7 +89,6 @@ pub mod microloan_transactions {
             timestamp: ctx.accounts.clock.unix_timestamp,
         });
 
-        // If adding TransactionEvent, use:
         emit!(TransactionEvent {
             tx_type: "fund".to_string(),
             user: ctx.accounts.lender.key(),
@@ -101,15 +97,9 @@ pub mod microloan_transactions {
             timestamp: ctx.accounts.clock.unix_timestamp,
         });
 
-        let transaction = &mut ctx.accounts.transaction;
-        transaction.tx_type = "fund".to_string();
-        transaction.user = ctx.accounts.lender.key();
-        transaction.loan_id = ctx.accounts.loan.id;
-        transaction.amount = amount;
-        transaction.timestamp = ctx.accounts.clock.unix_timestamp;
-
         Ok(())
     }
+
     pub fn repay_loan(ctx: Context<RepayLoan>, amount: u64, is_platform_fee: bool) -> Result<()> {
         let loan = &mut ctx.accounts.loan;
         let borrower = &ctx.accounts.borrower;
@@ -117,17 +107,15 @@ pub mod microloan_transactions {
         require!(loan.is_active, MicroLoanError::LoanNotActive);
         require!(!loan.is_completed, MicroLoanError::LoanAlreadyCompleted);
 
-        // Determine destination account
         let destination = if is_platform_fee {
             ctx.accounts.platform_account.to_account_info()
         } else {
             ctx.accounts.lender.to_account_info()
         };
 
-        // Create SOL transfer instruction
         let transfer_instruction = system_instruction::transfer(
-            &borrower.key(),    // Add reference here
-            &destination.key(), // Add reference here
+            &borrower.key(),
+            &destination.key(),
             amount,
         );
 
@@ -142,7 +130,6 @@ pub mod microloan_transactions {
 
         loan.total_repaid += amount;
 
-        // Check if the loan is fully repaid
         let interest_amount = (loan.amount as u128)
             .checked_mul(loan.interest_rate as u128)
             .unwrap_or(0)
@@ -156,14 +143,11 @@ pub mod microloan_transactions {
         if loan.total_repaid as u128 >= total_to_repay {
             loan.is_completed = true;
             loan.is_active = false;
-
-            // Update user's credit score and loans repaid
             let user = &mut ctx.accounts.user;
             user.credit_score += 1;
             user.loans_repaid += 1;
         }
 
-        // Emit repayment event
         emit!(RepaymentEvent {
             loan_id: loan.id,
             borrower: borrower.key(),
@@ -180,13 +164,6 @@ pub mod microloan_transactions {
             timestamp: Clock::get()?.unix_timestamp,
         });
 
-        let transaction = &mut ctx.accounts.transaction;
-        transaction.tx_type = "repay".to_string();
-        transaction.user = ctx.accounts.borrower.key();
-        transaction.loan_id = ctx.accounts.loan.id;
-        transaction.amount = amount;
-        transaction.timestamp = ctx.accounts.clock.unix_timestamp;
-
         Ok(())
     }
 }
@@ -194,12 +171,12 @@ pub mod microloan_transactions {
 #[derive(Accounts)]
 pub struct Initialize<'info> {
     #[account(
-            init,
-            payer = authority,
-            space = 8 + 32 + 8 + 8 + 4, // discriminator + pubkey + i64 + u64 + u32
-            seeds = [b"user", authority.key().as_ref()],
-            bump
-        )]
+        init,
+        payer = authority,
+        space = 8 + 32 + 8 + 8 + 4,
+        seeds = [b"user", authority.key().as_ref()],
+        bump
+    )]
     pub user: Account<'info, User>,
     #[account(mut)]
     pub authority: Signer<'info>,
@@ -208,21 +185,16 @@ pub struct Initialize<'info> {
 
 #[derive(Accounts)]
 pub struct CreateLoan<'info> {
-    #[account(
-        mut,
-        seeds = [b"user", borrower.key().as_ref()],
-        bump
-    )]
+    #[account(mut, seeds = [b"user", borrower.key().as_ref()], bump)]
     pub user: Account<'info, User>,
-
     #[account(
         init,
         payer = borrower,
-        space = 116, // Corrected space (8 + 108)
+        space = 116,
         seeds = [
             b"loan", 
             borrower.key().as_ref(), 
-            &user.loans_taken.to_le_bytes() // Full u64 support
+            &user.loans_taken.to_le_bytes()
         ],
         bump
     )]
@@ -240,19 +212,6 @@ pub struct FundLoan<'info> {
     pub borrower: AccountInfo<'info>,
     #[account(mut)]
     pub loan: Account<'info, Loan>,
-    #[account(
-        init,
-        payer = lender,
-        space = 80,
-        seeds = [
-            b"transaction",
-            loan.id.to_le_bytes().as_ref(),
-            b"fund",
-            &clock.unix_timestamp.to_le_bytes(),
-        ],
-        bump
-    )]
-    pub transaction: Account<'info, Transaction>,
     pub system_program: Program<'info, System>,
     pub clock: Sysvar<'info, Clock>,
 }
@@ -269,19 +228,6 @@ pub struct RepayLoan<'info> {
     pub platform_account: AccountInfo<'info>,
     #[account(mut)]
     pub user: Account<'info, User>,
-    #[account(
-        init,
-        payer = borrower,
-        space = 80,
-        seeds = [
-            b"transaction",
-            loan.id.to_le_bytes().as_ref(),
-            b"repay",
-            &clock.unix_timestamp.to_le_bytes(),
-        ],
-        bump
-    )]
-    pub transaction: Account<'info, Transaction>,
     pub system_program: Program<'info, System>,
     pub clock: Sysvar<'info, Clock>,
 }
@@ -300,21 +246,12 @@ pub struct Loan {
     pub borrower: Pubkey,
     pub lender: Pubkey,
     pub amount: u64,
-    pub interest_rate: u16, // basis points
-    pub duration: u64,      // in seconds
+    pub interest_rate: u16,
+    pub duration: u64,
     pub start_date: u64,
     pub total_repaid: u64,
     pub is_active: bool,
     pub is_completed: bool,
-}
-
-#[account]
-pub struct Transaction {
-    pub tx_type: String, // "fund" or "repay"
-    pub user: Pubkey,
-    pub loan_id: u64,
-    pub amount: u64,
-    pub timestamp: i64,
 }
 
 #[event]
@@ -343,7 +280,7 @@ pub struct RepaymentEvent {
 
 #[event]
 pub struct TransactionEvent {
-    pub tx_type: String, // "create", "fund", "repay"
+    pub tx_type: String,
     pub user: Pubkey,
     pub loan_id: u64,
     pub amount: u64,

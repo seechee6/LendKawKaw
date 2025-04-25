@@ -51,7 +51,9 @@ const JobInfoPage = () => {
   };
 
   const handleContinue = () => {
-    // In a real app, you would validate the form data here
+    // Store job information in session storage
+    sessionStorage.setItem('jobInfo', JSON.stringify(formData));
+    // Navigate to the next step
     navigate('/onboarding/upload-id');
   };
 
@@ -188,17 +190,25 @@ const JobInfoPage = () => {
         </form>
       </div>
 
-      {/* Bottom button */}
+      {/* Bottom buttons */}
       <div className="px-6 py-4 border-t border-gray-100">
-        <button
-          onClick={handleContinue}
-          className="w-full bg-secondary text-white font-semibold py-4 rounded-lg hover:bg-secondaryLight transition duration-200"
-        >
-          Continue
-        </button>
+        <div className="flex gap-4">
+          <button 
+            onClick={() => navigate('/onboarding/upload-id')}
+            className="w-1/3 border border-secondary text-secondary font-semibold py-4 rounded-lg hover:bg-secondary hover:bg-opacity-10 transition duration-200"
+          >
+            Skip
+          </button>
+          <button
+            onClick={handleContinue}
+            className="w-2/3 bg-secondary text-white font-semibold py-4 rounded-lg hover:bg-secondaryLight transition duration-200"
+          >
+            Continue
+          </button>
+        </div>
       </div>
     </div>
   );
 };
 
-export default JobInfoPage; 
+export default JobInfoPage;

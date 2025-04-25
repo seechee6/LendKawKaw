@@ -21,13 +21,16 @@ import {
   PersonalInfoPage,
   JobInfoPage,
   UploadIDPage,
+  IDReviewPage,
   SelfiePage,
   UploadPayslipPage,
   OnboardingSuccessPage,
   NotFoundPage,
   WithdrawTutorialPage,
   SolanaTestPage,
-  LoanDetailPage
+  LoanDetailPage,
+  CreditScorePage,
+  SmsTestPage
 } from "./pages";
 import { ThemeProvider } from "./context/ThemeContext";
 import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
@@ -73,9 +76,11 @@ const AppContent = () => {
             <Route path="/review-summary/:loanId" element={<ReviewSummaryPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/premium" element={<PremiumPage />} />
+            <Route path="/credit-score" element={<CreditScorePage />} />
             <Route path="/lender-reports" element={<LenderReportsPage />} />
             <Route path="/withdraw-tutorial" element={<WithdrawTutorialPage />} />
             <Route path="/solana-test" element={<SolanaTestPage />} />
+            <Route path="/sms-test" element={<SmsTestPage />} />
             
             {/* Onboarding routes */}
             <Route path="/onboarding" element={<Navigate to="/onboarding/welcome" replace />} />
@@ -83,6 +88,7 @@ const AppContent = () => {
             <Route path="/onboarding/personal-info" element={<PersonalInfoPage />} />
             <Route path="/onboarding/job-info" element={<JobInfoPage />} />
             <Route path="/onboarding/upload-id" element={<UploadIDPage />} />
+            <Route path="/onboarding/id-review" element={<IDReviewPage />} />
             <Route path="/onboarding/selfie" element={<SelfiePage />} />
             <Route path="/onboarding/upload-payslip" element={<UploadPayslipPage />} />
             <Route path="/onboarding/success" element={<OnboardingSuccessPage />} />

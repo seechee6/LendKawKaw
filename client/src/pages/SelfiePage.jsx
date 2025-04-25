@@ -1,31 +1,112 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { HiArrowLeft, HiCamera } from 'react-icons/hi';
 
 const SelfiePage = () => {
   const navigate = useNavigate();
-  const fileInputRef = useRef(null);
-  const [selfieImage, setSelfieImage] = useState(null);
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const [capturedImage, setCapturedImage] = useState(null);
+  const [livenessStatus, setLivenessStatus] = useState('inactive'); // 'inactive', 'checking', 'verified', 'failed'
+  const [cameraActive, setCameraActive] = useState(false);
+  const [livenessPrompt, setLivenessPrompt] = useState('');
+  
+  const livenessPrompts = [
+    'Please blink slowly',
+    'Look to the left',
+    'Look to the right',
+    'Now look straight ahead'
+  ];
 
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setSelfieImage(e.target.result);
-      };
-      reader.readAsDataURL(file);
+  useEffect(() => {
+    if (cameraActive) {
+      startCamera();
+    }
+    
+    return () => {
+      stopCamera();
+    };
+  }, [cameraActive]);
+  
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: 'user' }, 
+        audio: false 
+      });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        setLivenessStatus('checking');
+        startLivenessCheck();
+      }
+    } catch (err) {
+      console.error('Error accessing the camera:', err);
     }
   };
 
-  const triggerFileInput = () => {
-    fileInputRef.current.click();
+  const stopCamera = () => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      const tracks = videoRef.current.srcObject.getTracks();
+      tracks.forEach(track => track.stop());
+      videoRef.current.srcObject = null;
+    }
+  };
+  
+  const startLivenessCheck = () => {
+    // Simulate liveness detection process
+    let currentPromptIndex = 0;
+    
+    const promptInterval = setInterval(() => {
+      if (currentPromptIndex < livenessPrompts.length) {
+        setLivenessPrompt(livenessPrompts[currentPromptIndex]);
+        currentPromptIndex++;
+      } else {
+        clearInterval(promptInterval);
+        setLivenessPrompt('Verification complete');
+        setLivenessStatus('verified');
+        captureImage();
+      }
+    }, 3000);
+    
+    return () => clearInterval(promptInterval);
+  };
+
+  const captureImage = () => {
+    if (videoRef.current && canvasRef.current) {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      
+      // Set canvas dimensions to match video
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      
+      // Draw current video frame to canvas
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
+      // Convert canvas to data URL
+      const imageDataUrl = canvas.toDataURL('image/png');
+      setCapturedImage(imageDataUrl);
+      
+      // Stop camera after capturing
+      stopCamera();
+      setCameraActive(false);
+    }
+  };
+
+  const handleTryAgain = () => {
+    setCapturedImage(null);
+    setLivenessStatus('inactive');
+    setLivenessPrompt('');
+  };
+
+  const handleStartLiveness = () => {
+    setCameraActive(true);
   };
 
   const handleContinue = () => {
-    // In a real app, you would validate that a selfie was uploaded successfully
-    // Check with backend if the selfie passes verification
-    // Then navigate to a success or loan-application page
+    // In a real app, you would validate that liveness detection was successful
+    // Send the captured image to backend for further processing
     navigate('/onboarding/upload-payslip');
   };
 
@@ -51,109 +132,99 @@ const SelfiePage = () => {
       </div>
 
       <div className="flex-1 px-6 py-6">
-        <h1 className="text-2xl font-bold mb-2">Selfie with ID Card</h1>
-        <p className="text-gray-600 mb-6">Take a selfie holding your ID card next to your face. Ensure your face and ID card are clearly visible.</p>
+        <h1 className="text-2xl font-bold mb-2">Face Verification</h1>
+        <p className="text-gray-600 mb-6">Complete a quick liveness check to verify your identity. Follow the on-screen instructions.</p>
 
-        {/* Selfie Camera Section */}
+        {/* Liveness Detection Section */}
         <div className="flex-1 flex flex-col items-center mb-8">
-          {selfieImage ? (
+          <canvas ref={canvasRef} className="hidden"></canvas>
+          
+          {capturedImage ? (
             <div className="relative w-full">
               <img 
-                src={selfieImage} 
-                alt="Selfie with ID" 
+                src={capturedImage} 
+                alt="Captured selfie" 
                 className="w-full h-64 object-cover border border-gray-300 rounded-lg"
               />
+              <div className="absolute top-2 right-2 bg-green-500 text-white px-3 py-1 rounded-full text-sm">
+                Verified
+              </div>
               <button 
-                onClick={triggerFileInput}
+                onClick={handleTryAgain}
                 className="mt-4 text-secondary hover:text-secondaryLight font-medium"
               >
-                Retake Photo
+                Try Again
               </button>
             </div>
           ) : (
             <div className="w-full h-72 bg-gray-100 rounded-xl relative overflow-hidden">
-              {/* Illustration of person with ID */}
-              <div className="absolute w-full h-full flex items-center justify-center">
-                <div className="relative">
-                  {/* Simplified illustration */}
-                  <div className="w-32 h-48 flex flex-col items-center">
-                    {/* Head */}
-                    <div className="w-16 h-16 bg-gray-700 rounded-full flex flex-col items-center justify-end">
-                      {/* Face details */}
-                      <div className="w-10 h-4 bg-gray-900 rounded-full absolute top-10"></div>
-                    </div>
-                    
-                    {/* Body */}
-                    <div className="w-24 h-32 bg-secondary mt-1 rounded-t-xl">
-                      {/* ID Card on right side */}
-                      <div className="absolute right-0 top-20 transform rotate-12">
-                        <div className="w-14 h-10 bg-gray-200 border-2 border-gray-400 rounded flex items-center justify-center">
-                          <div className="w-10 h-6 bg-blue-900"></div>
-                        </div>
+              {cameraActive ? (
+                <>
+                  <video 
+                    ref={videoRef} 
+                    autoPlay 
+                    playsInline 
+                    className="w-full h-full object-cover"
+                  ></video>
+                  
+                  {/* Liveness prompt overlay */}
+                  {livenessStatus === 'checking' && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-black bg-opacity-20 text-white">
+                      <div className="bg-black bg-opacity-70 px-4 py-2 rounded-lg">
+                        {livenessPrompt}
                       </div>
+                    </div>
+                  )}
+                  
+                  {/* Positioning guide */}
+                  <div className="absolute inset-0 border-2 border-dashed border-white m-4 rounded-full pointer-events-none"></div>
+                </>
+              ) : (
+                <div className="absolute w-full h-full flex items-center justify-center">
+                  <div className="relative">
+                    {/* Simple face outline */}
+                    <div className="w-32 h-48 flex flex-col items-center">
+                      {/* Head */}
+                      <div className="w-24 h-24 border-4 border-gray-300 rounded-full"></div>
                       
-                      {/* Scarf */}
-                      <div className="absolute top-16 left-0 w-20 h-8 bg-secondaryLight rounded-r-xl"></div>
+                      {/* Body outline */}
+                      <div className="w-24 h-20 border-t-0 border-4 border-gray-300 mt-1 rounded-b-xl"></div>
                     </div>
                   </div>
-                  
-                  {/* Decorative elements */}
-                  <div className="absolute -bottom-4 -left-16 w-3 h-3 bg-purple-500 rounded-full"></div>
-                  <div className="absolute -top-8 -right-12 w-4 h-4 bg-yellow-400 rounded-full"></div>
-                  <div className="absolute bottom-10 right-0 w-2 h-2 bg-red-500 rounded-full"></div>
-                  <div className="absolute -bottom-2 right-16 w-3 h-3 bg-blue-400 rounded-full"></div>
                 </div>
-              </div>
-              
-              {/* Frame guide */}
-              <div className="absolute inset-0 border-2 border-dashed border-gray-400 m-4 rounded-lg pointer-events-none"></div>
-              
-              {/* Positioning guides */}
-              <div className="absolute top-10 left-10 w-3 h-3 border-2 border-white rounded-full"></div>
-              <div className="absolute top-10 right-10 w-3 h-3 border-2 border-white rounded-full"></div>
-              <div className="absolute bottom-10 left-10 w-3 h-3 border-2 border-white rounded-full"></div>
-              <div className="absolute bottom-10 right-10 w-3 h-3 border-2 border-white rounded-full"></div>
+              )}
             </div>
           )}
           
-          {!selfieImage && (
+          {!cameraActive && !capturedImage && (
             <button 
-              onClick={triggerFileInput}
+              onClick={handleStartLiveness}
               className="mt-6 bg-secondary text-white rounded-full p-4 shadow-lg hover:bg-secondaryLight transition-colors focus:outline-none"
             >
               <HiCamera className="w-8 h-8" />
             </button>
           )}
-          
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            accept="image/*" 
-            capture="user"
-            onChange={handleFileChange}
-            className="hidden" 
-          />
         </div>
 
         {/* Tips */}
         <div className="mb-6">
-          <h3 className="text-lg font-semibold mb-3">Tips for a good photo:</h3>
+          <h3 className="text-lg font-semibold mb-3">Tips for successful verification:</h3>
           <ul className="space-y-2 text-gray-600">
             <li className="flex items-start">
               <span className="mr-2">•</span>
-              <span>Hold your ID card next to your face</span>
-            </li>
-            <li className="flex items-start">
-              <span className="mr-2">•</span>
-              <span>Ensure both your face and all ID details are visible</span>
-            </li>
-            <li className="flex items-start">
-              <span className="mr-2">•</span>
-              <span>Take the photo in a well-lit area</span>
+              <span>Ensure you're in a well-lit environment</span>
             </li>
             <li className="flex items-start">
               <span className="mr-2">•</span>
               <span>Remove glasses or anything covering your face</span>
+            </li>
+            <li className="flex items-start">
+              <span className="mr-2">•</span>
+              <span>Follow all on-screen instructions carefully</span>
+            </li>
+            <li className="flex items-start">
+              <span className="mr-2">•</span>
+              <span>Keep your face within the outline</span>
             </li>
           </ul>
         </div>
@@ -163,14 +234,14 @@ const SelfiePage = () => {
       <div className="px-6 py-4 border-t border-gray-100">
         <button
           onClick={handleContinue}
-          className={`w-full font-semibold py-4 rounded-lg transition duration-200 ${selfieImage ? 'bg-secondary text-white hover:bg-secondaryLight' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}`}
-          disabled={!selfieImage}
+          className={`w-full font-semibold py-4 rounded-lg transition duration-200 ${capturedImage ? 'bg-secondary text-white hover:bg-secondaryLight' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}`}
+          disabled={!capturedImage}
         >
-          Take Selfie
+          {livenessStatus === 'checking' ? 'Verifying...' : 'Continue'}
         </button>
       </div>
     </div>
   );
 };
 
-export default SelfiePage; 
+export default SelfiePage;

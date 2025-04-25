@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { HalfCircleBackground } from '../components';
-import { getLoanById } from '../services/databaseService';
+import { getLoanById, getUserPhoneNumber } from '../services/databaseService';
+import { sendPaymentConfirmation } from '../services/smsService';
 import { TransactionContext } from '../context/TransactionContext';
+import { toast } from 'react-hot-toast';
 
 // ChevronDownIcon component
 const ChevronDownIcon = ({ className = "h-5 w-5" }) => (
@@ -18,7 +20,9 @@ const ReviewSummaryPage = () => {
   const { currentAccount } = useContext(TransactionContext);
   const [loanDetails, setLoanDetails] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [phoneNumber, setPhoneNumber] = useState('');
 
   useEffect(() => {
     // Fetch loan details from our database service
@@ -30,10 +34,24 @@ const ReviewSummaryPage = () => {
         const loan = await getLoanById(loanIdToFetch);
         
         if (loan) {
+          const nextPaymentDate = new Date(loan.nextPaymentDate);
+          // Calculate next payment date by adding one month to current payment date
+          const nextMonth = nextPaymentDate.getMonth() + 1;
+          const nextYear = nextPaymentDate.getMonth() === 11 
+            ? nextPaymentDate.getFullYear() + 1 
+            : nextPaymentDate.getFullYear();
+          
+          const nextDueDate = new Date(nextYear, nextMonth % 12, nextPaymentDate.getDate());
+          
           setLoanDetails({
             id: loan.id,
             amount: loan.paymentAmount,
-            repaymentDate: new Date(loan.nextPaymentDate).toLocaleDateString('en-US', {
+            repaymentDate: nextPaymentDate.toLocaleDateString('en-US', {
+              month: 'short', 
+              day: 'numeric', 
+              year: 'numeric'
+            }),
+            nextDueDate: nextDueDate.toLocaleDateString('en-US', {
               month: 'short', 
               day: 'numeric', 
               year: 'numeric'
@@ -42,8 +60,18 @@ const ReviewSummaryPage = () => {
             period: loan.period,
             totalAmount: loan.paymentAmount,
             principal: loan.principal,
-            interest: loan.interestAmount
+            interest: loan.interestAmount,
+            borrowerId: loan.borrowerId,
+            smsRemindersEnabled: loan.smsRemindersEnabled || false,
+            monthlyPayment: loan.paymentAmount,
+            term: loan.term || '12 months'
           });
+          
+          // Fetch the user's phone number if available
+          if (loan.borrowerId) {
+            const phone = await getUserPhoneNumber(loan.borrowerId);
+            setPhoneNumber(phone);
+          }
         }
         
         setIsLoading(false);
@@ -56,11 +84,51 @@ const ReviewSummaryPage = () => {
     fetchLoanDetails();
   }, [loanId]);
 
-  const handlePayNow = () => {
-    // In a real app, this would initiate a payment transaction using Metamask
-    alert(`Processing payment for loan ID: ${loanId} using Metamask`);
-    // Navigate to a success page or back to home after payment
-    navigate('/');
+  const handlePayNow = async () => {
+    try {
+      setIsProcessing(true);
+      
+      // Simulate blockchain transaction
+      toast.loading("Processing payment transaction...");
+      
+      // In a real app, this would initiate a payment transaction using Metamask or blockchain
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      toast.dismiss();
+      toast.success("Payment successful!");
+      
+      // Send SMS confirmation if phone number is available and SMS reminders are enabled
+      if (phoneNumber && loanDetails.smsRemindersEnabled) {
+        const paymentDetails = {
+          amount: loanDetails.amount,
+          nextDueDate: loanDetails.nextDueDate
+        };
+        
+        // Send payment confirmation SMS
+        const smsResult = await sendPaymentConfirmation(phoneNumber, paymentDetails);
+        
+        if (smsResult.success) {
+          console.log("Payment confirmation SMS sent successfully");
+        } else {
+          console.error("Failed to send payment confirmation SMS:", smsResult.error);
+        }
+      }
+      
+      // Navigate to success page or back to home after payment
+      navigate('/', { 
+        state: { 
+          paymentSuccess: true,
+          loanId: loanDetails.id,
+          amount: loanDetails.amount
+        } 
+      });
+    } catch (error) {
+      console.error("Payment error:", error);
+      toast.dismiss();
+      toast.error("Payment failed. Please try again.");
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const toggleExpanded = () => {
@@ -149,18 +217,47 @@ const ReviewSummaryPage = () => {
           </div>
         </div>
 
+        {/* SMS Receipt Option */}
+        {phoneNumber && loanDetails.smsRemindersEnabled && (
+          <div className="mb-4 p-4 bg-blue-50 rounded-lg">
+            <div className="flex items-center mb-2">
+              <svg className="w-5 h-5 text-blue-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+              </svg>
+              <span className="font-medium text-blue-700">SMS Receipt</span>
+            </div>
+            <p className="text-sm text-blue-600">
+              A payment confirmation will be sent to {phoneNumber} after successful payment.
+            </p>
+          </div>
+        )}
+
         {/* Pay Now Button */}
-        <button 
-          className="w-full bg-secondary text-white font-medium py-4 rounded-lg hover:bg-secondaryLight transition duration-200"
-          onClick={handlePayNow}
-        >
-          Pay Now - RM {loanDetails.amount}
-        </button>
+        {isProcessing ? (
+          <button 
+            className="w-full bg-gray-400 text-white font-medium py-4 rounded-lg flex items-center justify-center cursor-not-allowed"
+            disabled
+          >
+            <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            Processing...
+          </button>
+        ) : (
+          <button 
+            className="w-full bg-secondary text-white font-medium py-4 rounded-lg hover:bg-secondaryLight transition duration-200"
+            onClick={handlePayNow}
+          >
+            Pay Now - RM {loanDetails.amount}
+          </button>
+        )}
 
         {/* Back Button */}
         <button 
           onClick={() => navigate(`/repay/${loanId}`)}
           className="flex items-center text-blue-700 font-medium mt-4 mx-auto"
+          disabled={isProcessing}
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -172,4 +269,4 @@ const ReviewSummaryPage = () => {
   );
 };
 
-export default ReviewSummaryPage; 
+export default ReviewSummaryPage;

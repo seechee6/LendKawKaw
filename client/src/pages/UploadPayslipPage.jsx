@@ -6,7 +6,7 @@ const UploadPayslipPage = () => {
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
   const [uploadedFiles, setUploadedFiles] = useState([]);
-  const [documentType, setDocumentType] = useState('payslip'); // 'payslip', 'bank', or 'receipts'
+  const [documentType, setDocumentType] = useState('payslip'); // 'payslip', 'bank', 'receipts', or 'education'
 
   const handleFileChange = (e) => {
     const files = Array.from(e.target.files);
@@ -65,15 +65,15 @@ const UploadPayslipPage = () => {
       </div>
 
       <div className="flex-1 px-6 py-6">
-        <h1 className="text-2xl font-bold mb-2">Upload Financial Documents</h1>
-        <p className="text-gray-600 mb-6">Please upload your financial documents to help us assess your loan eligibility. If you don't have a payslip, you can upload bank statements or receipts.</p>
+        <h1 className="text-2xl font-bold mb-2">Upload Documents</h1>
+        <p className="text-gray-600 mb-6">Please upload your financial documents or educational certificates to help us assess your loan eligibility. If you don't have a payslip, you can upload bank statements, receipts or education certifications.</p>
 
         {/* Document Type Selector */}
         <div className="mb-6">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             What type of documents are you uploading?
           </label>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <button
               onClick={() => setDocumentType('payslip')}
               className={`py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
@@ -104,6 +104,16 @@ const UploadPayslipPage = () => {
             >
               Receipts
             </button>
+            <button
+              onClick={() => setDocumentType('education')}
+              className={`py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+                documentType === 'education' 
+                  ? 'bg-secondary text-white' 
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Education Cert
+            </button>
           </div>
         </div>
 
@@ -127,6 +137,13 @@ const UploadPayslipPage = () => {
             <div className="text-sm text-blue-800">
               <p className="font-medium mb-2">Please upload receipts of your regular expenses and income.</p>
               <p>Include receipts for utilities, rent, business income, or any regular financial transactions from the last 3 months.</p>
+            </div>
+          )}
+
+          {documentType === 'education' && (
+            <div className="text-sm text-blue-800">
+              <p className="font-medium mb-2">Please upload your education certificates or transcripts.</p>
+              <p>Include degree certificates, course completion certificates, or official transcripts that verify your educational qualifications.</p>
             </div>
           )}
         </div>
@@ -178,7 +195,14 @@ const UploadPayslipPage = () => {
             className="w-full border-2 border-dashed border-gray-300 rounded-lg p-6 flex flex-col items-center cursor-pointer hover:border-secondary transition-colors"
           >
             <HiUpload className="w-10 h-10 text-gray-400 mb-3" />
-            <p className="text-gray-700 font-medium mb-1">Upload {documentType === 'payslip' ? 'Payslips' : documentType === 'bank' ? 'Bank Statements' : 'Receipts'}</p>
+            <p className="text-gray-700 font-medium mb-1">
+              Upload {
+                documentType === 'payslip' ? 'Payslips' : 
+                documentType === 'bank' ? 'Bank Statements' : 
+                documentType === 'education' ? 'Education Certificates' : 
+                'Receipts'
+              }
+            </p>
             <p className="text-gray-500 text-sm text-center mb-3">
               Click to browse your files or drag and drop them here
             </p>
@@ -226,4 +250,4 @@ const UploadPayslipPage = () => {
   );
 };
 
-export default UploadPayslipPage; 
+export default UploadPayslipPage;

@@ -256,18 +256,19 @@ const PersonalInfoPage = () => {
           <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
             <h3 className="font-semibold text-gray-800 mb-2">Data Protection Consent</h3>
             <p className="text-sm text-gray-600 mb-4">
-              We collect, process, and store your personal data to:
+              In accordance with the Personal Data Protection Act 2010, we collect and process your personal data to:
               <ul className="list-disc pl-5 mt-2 space-y-1">
-                <li>Process your loan application</li>
-                <li>Perform credit scoring and identity verification</li>
+                <li>Process your loan application internally</li>
+                <li>Perform credit scoring and identity verification within our system</li>
                 <li>Communicate with you about our services</li>
                 <li>Fulfill legal and regulatory requirements</li>
               </ul>
             </p>
             
             <p className="text-sm text-gray-600 mb-4">
-              Your data will only be shared with relevant parties (credit bureaus, identity verification services, and financial institutions) 
-              when necessary to deliver our services. You can request access, correction, or deletion of your personal data at any time.
+              Your data will be used exclusively for internal processing and will not be shared with third parties.
+              We are committed to protecting your privacy in accordance with the Personal Data Protection Act 2010.
+              For the purposes of providing our services, this data will be retained throughout the duration of your relationship with us.
             </p>
             
             <div className="flex items-start mt-2">
@@ -282,7 +283,7 @@ const PersonalInfoPage = () => {
                 />
               </div>
               <label htmlFor="dataConsentAccepted" className="ml-3 text-sm">
-                I explicitly consent to the collection, processing, and disclosure of my personal data as described above.
+                I explicitly consent to the collection and processing of my personal data for the purposes stated above, as required by the Personal Data Protection Act 2010.
               </label>
             </div>
             {formErrors.dataConsentAccepted && (

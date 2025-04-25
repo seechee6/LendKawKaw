@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { getLoanDetails } from '../services/databaseService';
 import { Loader, HalfCircleBackground } from '../components';
 import { 
@@ -22,6 +22,7 @@ import { MdPayments } from 'react-icons/md';
 const LoanDetailPage = () => {
   const { loanId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [loanDetails, setLoanDetails] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [copiedText, setCopiedText] = useState('');
@@ -36,8 +37,14 @@ const LoanDetailPage = () => {
     const fetchLoanDetails = async () => {
       setIsLoading(true);
       try {
-        const details = await getLoanDetails(loanId);
-        setLoanDetails(details);
+        // First check if loan data was passed via location state
+        if (location.state && location.state.loan) {
+          setLoanDetails(location.state.loan);
+        } else {
+          // Fall back to fetching from database if no state was passed
+          const details = await getLoanDetails(loanId);
+          setLoanDetails(details);
+        }
       } catch (error) {
         console.error('Error fetching loan details:', error);
       } finally {
@@ -46,7 +53,7 @@ const LoanDetailPage = () => {
     };
 
     fetchLoanDetails();
-  }, [loanId]);
+  }, [loanId, location.state]);
 
   const handleBack = () => {
     navigate(-1);
@@ -239,6 +246,132 @@ const LoanDetailPage = () => {
     return `https://explorer.solana.com/tx/${hash}`;
   };
 
+  // Generate blockchain loan milestones based on loan data
+  const generateBlockchainLoanMilestones = (loan) => {
+    if (!loan || !loan.isBlockchainLoan) return loanMilestones;
+    
+    const milestones = [];
+    
+    // Application milestone
+    milestones.push({
+      id: 1,
+      status: 'completed',
+      title: 'Loan Application Submitted',
+      icon: <IoDocumentTextOutline className="text-primary w-5 h-5" />,
+      date: new Date(loan.startDate || Date.now() - 86400000).toLocaleDateString(),
+      time: new Date(loan.startDate || Date.now() - 86400000).toLocaleTimeString(),
+      description: `You applied for a loan of RM ${loan.amount} with ${loan.interestRate}% interest rate for ${loan.duration} months.`,
+      walletInfo: {
+        from: loan.borrower,
+        to: 'Platform Smart Contract',
+      },
+      txHash: '',
+      blockchainDetails: 'Application data stored on Solana blockchain'
+    });
+    
+    // Loan status based milestones
+    if (loan.isActive) {
+      // Funding milestone
+      milestones.push({
+        id: 2,
+        status: 'completed',
+        title: 'Loan Funded by Lender',
+        icon: <IoWalletOutline className="text-primary w-5 h-5" />,
+        date: new Date(loan.startDate || Date.now() - 86400000).toLocaleDateString(),
+        time: new Date(loan.startDate || Date.now() - 86400000).toLocaleTimeString(),
+        description: `Your loan request was funded by a lender. Funds of RM ${loan.amount} have been transferred to your wallet.`,
+        walletInfo: {
+          from: loan.lender || 'Lender Address',
+          to: loan.borrower,
+        },
+        txHash: loan.transactionSignature || '',
+        blockchainDetails: `Principal loan amount of RM ${loan.amount} transferred directly to your wallet`
+      });
+      
+      // Repayment Period milestone
+      const repaymentMilestone = {
+        id: 3,
+        status: 'in-progress',
+        title: 'Repayment Period',
+        icon: <IoCalendarOutline className="text-primary w-5 h-5" />,
+        date: `${new Date(loan.startDate || Date.now()).toLocaleDateString()} - Future`,
+        time: '',
+        description: `Monthly payment of RM ${loan.paymentAmount} due each month for ${loan.duration} months.`,
+        walletInfo: {},
+        txHash: '',
+        blockchainDetails: 'The smart contract automatically splits each payment between lender and platform',
+        children: []
+      };
+      
+      // Add repayment children
+      for (let i = 0; i < Math.min(loan.duration, 12); i++) {
+        const paymentDate = new Date(loan.startDate || Date.now());
+        paymentDate.setMonth(paymentDate.getMonth() + i + 1);
+        
+        const isPast = paymentDate < new Date();
+        const status = isPast ? 'completed' : 'upcoming';
+        
+        repaymentMilestone.children.push({
+          id: `payment-${i+1}`,
+          status: status,
+          title: `Payment ${i+1} of ${Math.ceil(loan.duration)}`,
+          icon: <IoCardOutline className="text-primary w-4 h-4" />,
+          date: paymentDate.toLocaleDateString(),
+          time: '',
+          description: `Payment of RM ${loan.paymentAmount}`,
+          walletInfo: {
+            from: loan.borrower,
+            to: 'Payment Distributor',
+          },
+          txHash: '',
+          blockchainDetails: status === 'upcoming' ? 'Ensure your wallet has sufficient funds before the due date' : 'Payment completed'
+        });
+      }
+      
+      milestones.push(repaymentMilestone);
+      
+      // Loan Completion milestone
+      const completionDate = new Date(loan.startDate || Date.now());
+      completionDate.setMonth(completionDate.getMonth() + Math.ceil(loan.duration));
+      
+      milestones.push({
+        id: 4,
+        status: 'upcoming',
+        title: 'Loan Completion',
+        icon: <IoCheckmarkCircle className="text-primary w-5 h-5" />,
+        date: completionDate.toLocaleDateString(),
+        time: '',
+        description: 'Expected loan completion date. Your credit score will increase upon successful repayment.',
+        walletInfo: {
+          completionAction: 'Smart contract will automatically mark your loan as complete and update your credit score on-chain'
+        },
+        txHash: '',
+        blockchainDetails: 'Your credit score will be updated on the blockchain after your final payment'
+      });
+    } else {
+      // Pending approval milestone
+      milestones.push({
+        id: 2,
+        status: 'in-progress',
+        title: 'Awaiting Funding',
+        icon: <IoHourglassOutline className="text-primary w-5 h-5" />,
+        date: new Date().toLocaleDateString(),
+        time: '',
+        description: 'Your loan is waiting to be funded by a lender.',
+        walletInfo: {},
+        txHash: '',
+        blockchainDetails: 'Loan visible in the available loans pool on blockchain'
+      });
+    }
+    
+    return milestones;
+  };
+
+  // Use the loan details to render either hardcoded milestones or blockchain loan milestones
+  const displayMilestones = loanDetails?.isBlockchainLoan 
+    ? generateBlockchainLoanMilestones(loanDetails) 
+    : loanMilestones;
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center min-h-screen bg-neutral">
@@ -248,415 +381,339 @@ const LoanDetailPage = () => {
   }
 
   return (
-    <HalfCircleBackground title="Loan Details">
-      <div className="max-w-lg mx-auto pt-1 pb-10 w-full">
+    <HalfCircleBackground title="Loan Timeline">
+      <div className="max-w-lg mx-auto pt-1 w-full pb-8">
         <button 
           onClick={handleBack}
-          className="flex items-center text-white mb-6"
-          aria-label="Go back"
+          className="flex items-center text-white mb-6 hover:opacity-80 transition-opacity"
         >
           <IoArrowBack className="mr-2" />
           <span>Back</span>
         </button>
 
-        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
-          <h1 className="text-2xl font-bold mb-2">Business Expansion Loan</h1>
-          <div className="grid grid-cols-2 gap-4 mb-4">
+        {/* Loan Info Card */}
+        <div className="bg-white rounded-lg shadow-md p-5 mb-6">
+          <div className="flex justify-between items-start mb-4">
             <div>
-              <p className="text-sm text-gray-500">Loan Amount</p>
-              <p className="text-xl font-semibold">RM 45,000.00</p>
+              <h2 className="text-xl font-semibold">
+                {loanDetails?.title || loanDetails?.description || 'Loan Details'}
+              </h2>
+              <p className="text-gray-600 text-sm">
+                {loanDetails?.isBlockchainLoan 
+                  ? `ID: ${loanDetails?.publicKey?.substring(0, 10)}...` 
+                  : `ID: ${loanId || loanDetails?.id || 'Unknown'}`}
+              </p>
             </div>
-            <div>
-              <p className="text-sm text-gray-500">Loan ID</p>
-              <p className="text-xl font-semibold">#28925</p>
+            <div className={`px-3 py-1 rounded-full text-sm font-medium 
+              ${loanDetails?.isActive ? 'bg-blue-100 text-blue-800' : 
+                loanDetails?.isCompleted ? 'bg-green-100 text-green-800' : 
+                'bg-yellow-100 text-yellow-800'}`}
+            >
+              {loanDetails?.isActive ? 'Active' : 
+               loanDetails?.isCompleted ? 'Completed' : 'Pending'}
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+
+          <div className="grid grid-cols-2 gap-4 mb-2">
             <div>
-              <p className="text-sm text-gray-500">Interest Rate</p>
-              <p className="text-lg font-semibold">10%</p>
+              <p className="text-gray-600 text-sm">Amount</p>
+              <p className="font-semibold">RM {loanDetails?.amount || '0'}</p>
             </div>
             <div>
-              <p className="text-sm text-gray-500">Repayment Period</p>
-              <p className="text-lg font-semibold">12 months</p>
+              <p className="text-gray-600 text-sm">Interest Rate</p>
+              <p className="font-semibold">{loanDetails?.interestRate || '0'}%</p>
+            </div>
+            <div>
+              <p className="text-gray-600 text-sm">Duration</p>
+              <p className="font-semibold">{loanDetails?.duration || '0'} months</p>
+            </div>
+            <div>
+              <p className="text-gray-600 text-sm">Monthly Payment</p>
+              <p className="font-semibold">RM {loanDetails?.paymentAmount || '0'}</p>
             </div>
           </div>
+          
+          {/* Blockchain link for blockchain loans */}
+          {loanDetails?.isBlockchainLoan && loanDetails?.publicKey && (
+            <div className="mt-4 pt-4 border-t border-gray-100">
+              <a 
+                href={`https://explorer.solana.com/address/${loanDetails.publicKey}?cluster=devnet`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center text-sm text-blue-600 hover:text-blue-800"
+              >
+                <IoLinkOutline className="mr-1" />
+                View on Solana Explorer
+                <FiExternalLink className="ml-1 h-3 w-3" />
+              </a>
+            </div>
+          )}
         </div>
 
-        <div className="bg-white rounded-xl shadow-lg p-6">
-          <h2 className="text-xl font-bold mb-2">Blockchain Visualizer</h2>
-          <p className="text-sm text-gray-500 mb-6">Track how your loan flows through the blockchain</p>
+        {/* Blockchain Visualization Timeline */}
+        <div className="bg-white rounded-lg shadow-md p-5 mb-6">
+          <h3 className="text-lg font-semibold mb-4">Blockchain Visualizer</h3>
           
           <div className="relative">
-            {/* Timeline track - moved slightly to the left */}
-            <div className="absolute left-[13px] top-0 bottom-0 w-0.5 bg-gray-200"></div>
+            {/* Timeline visualization */}
+            <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-gray-200 z-0"></div>
             
-            {/* Timeline events */}
-            <div className="space-y-5">
-              {loanMilestones.map((milestone, index) => (
-                <div key={milestone.id} className="relative pl-10">
-                  {/* Circle indicator */}
-                  <div className="absolute left-0 top-1 z-10 flex items-center justify-center">
-                    {getStatusIcon(milestone.status)}
+            {/* Timeline milestones */}
+            <div className="space-y-8 relative z-10">
+              {displayMilestones.map((milestone) => (
+                <div key={milestone.id} className="relative">
+                  {/* Milestone header */}
+                  <div className="flex items-start">
+                    <div className="flex-shrink-0 h-12 w-12 rounded-full bg-white flex items-center justify-center border-2 border-gray-200">
+                      {getStatusIcon(milestone.status)}
+                    </div>
+                    <div className="ml-4 flex-grow">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h4 className="text-md font-medium">{milestone.title}</h4>
+                          <p className="text-sm text-gray-500">{milestone.date} {milestone.time ? `• ${milestone.time}` : ''}</p>
+                        </div>
+                        {milestone.children && (
+                          <button 
+                            onClick={() => toggleMilestoneExpand(milestone.id)}
+                            className="text-gray-400 hover:text-gray-600"
+                          >
+                            {expandedMilestones[milestone.id] ? (
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 15l7-7 7 7" />
+                              </svg>
+                            ) : (
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                              </svg>
+                            )}
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   </div>
                   
-                  {/* Content */}
-                  <div className="pb-4">
-                    {/* Milestone header - always visible */}
-                    <div 
-                      className="flex items-center justify-between cursor-pointer"
-                      onClick={() => toggleMilestoneExpand(milestone.id)}
-                    >
-                      <div className="flex items-center">
-                        <span className="mr-2">{milestone.icon}</span>
-                        <h3 className="text-lg font-semibold">{milestone.title}</h3>
-                      </div>
-                      {/* Don't show expand arrow for repayment period as its children are always shown */}
-                      {milestone.id !== 4 && (
-                        <button 
-                          className={`text-gray-500 transition-transform duration-200 ${expandedMilestones[milestone.id] ? 'transform rotate-90' : ''}`}
-                          aria-label={expandedMilestones[milestone.id] ? "Collapse details" : "Expand details"}
-                        >
-                          <IoArrowForward />
-                        </button>
+                  {/* Milestone details */}
+                  {(!milestone.children || expandedMilestones[milestone.id]) && (
+                    <div className="ml-16 mt-2">
+                      <p className="text-gray-700 mb-2">{milestone.description}</p>
+                      
+                      {/* Wallet info */}
+                      {milestone.walletInfo && Object.keys(milestone.walletInfo).length > 0 && (
+                        <div className="bg-gray-50 rounded-md p-3 mb-2">
+                          <h5 className="text-sm font-medium text-gray-700 mb-2">Transaction Details</h5>
+                          {milestone.walletInfo.from && (
+                            <div className="flex justify-between items-center mb-1">
+                              <span className="text-xs text-gray-500">From:</span>
+                              <div className="flex items-center">
+                                <span className="text-xs font-medium">{truncateAddress(milestone.walletInfo.from)}</span>
+                                <button 
+                                  onClick={() => handleCopyToClipboard(milestone.walletInfo.from)}
+                                  className="ml-1 text-gray-400 hover:text-gray-600"
+                                >
+                                  <BiCopy size={14} />
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                          {milestone.walletInfo.to && (
+                            <div className="flex justify-between items-center mb-1">
+                              <span className="text-xs text-gray-500">To:</span>
+                              <div className="flex items-center">
+                                <span className="text-xs font-medium">{truncateAddress(milestone.walletInfo.to)}</span>
+                                <button 
+                                  onClick={() => handleCopyToClipboard(milestone.walletInfo.to)}
+                                  className="ml-1 text-gray-400 hover:text-gray-600"
+                                >
+                                  <BiCopy size={14} />
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                          {milestone.walletInfo.splits && (
+                            <div className="mt-1 pt-1 border-t border-gray-200">
+                              <p className="text-xs text-gray-500 mb-1">Payment Split:</p>
+                              {milestone.walletInfo.splits.map((split, idx) => (
+                                <div key={idx} className="flex justify-between items-center pl-2 mb-1">
+                                  <span className="text-xs text-gray-500">• {truncateAddress(split.to)}</span>
+                                  <span className="text-xs font-medium">{split.amount}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {milestone.walletInfo.completionAction && (
+                            <p className="text-xs text-gray-700 mt-1">{milestone.walletInfo.completionAction}</p>
+                          )}
+                        </div>
+                      )}
+                      
+                      {/* Transaction info */}
+                      {milestone.txHash && (
+                        <div className="flex items-center mb-2">
+                          <span className="text-xs text-gray-500 mr-2">Transaction:</span>
+                          <span className="text-xs font-mono">{truncateAddress(milestone.txHash)}</span>
+                          <button 
+                            onClick={() => handleCopyToClipboard(milestone.txHash)}
+                            className="ml-1 text-gray-400 hover:text-gray-600"
+                          >
+                            <BiCopy size={14} />
+                          </button>
+                          <a 
+                            href={getExplorerUrl(milestone.txHash)} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="ml-2 text-blue-500 hover:text-blue-700"
+                          >
+                            <FiExternalLink size={14} />
+                          </a>
+                        </div>
+                      )}
+                      
+                      {/* Blockchain info */}
+                      {milestone.blockchainDetails && (
+                        <p className="text-xs text-gray-600 italic">{milestone.blockchainDetails}</p>
                       )}
                     </div>
-                    
-                    {/* Date/time info - always visible */}
-                    <div className="text-sm text-gray-500 mt-1 mb-1">
-                      {milestone.date} {milestone.time && `• ${milestone.time}`}
-                    </div>
-                    
-                    {/* Brief description - always visible */}
-                    <p className="text-gray-600 text-sm">{milestone.description}</p>
-                    
-                    {/* Expanded blockchain details */}
-                    {expandedMilestones[milestone.id] && (
-                      <>
-                        {(milestone.walletInfo && Object.keys(milestone.walletInfo).length > 0 || milestone.txHash) && (
-                          <div className="bg-gray-50 p-3 rounded-lg border border-gray-100 mt-3 text-sm">
-                            {milestone.walletInfo && Object.keys(milestone.walletInfo).length > 0 && (
-                              <div className="mb-3">
-                                <h4 className="text-xs font-semibold text-gray-700 mb-2 flex items-center">
-                                  <IoLinkOutline className="mr-1" /> Blockchain Information
-                                </h4>
-                                
-                                {milestone.walletInfo.from && (
-                                  <div className="flex items-center mb-2">
-                                    <span className="text-xs text-gray-500 w-10">From:</span>
-                                    <div className="flex items-center flex-1 overflow-hidden">
-                                      <span className="text-xs font-mono bg-gray-100 py-1 px-2 rounded truncate max-w-[200px]">
-                                        {milestone.walletInfo.from.includes(': ') 
-                                          ? milestone.walletInfo.from.split(': ')[0] + ': ' + truncateAddress(milestone.walletInfo.from.split(': ')[1])
-                                          : truncateAddress(milestone.walletInfo.from)
-                                        }
-                                      </span>
-                                      <button 
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleCopyToClipboard(milestone.walletInfo.from.split(': ')[1] || milestone.walletInfo.from);
-                                        }}
-                                        className="ml-1 text-gray-500 hover:text-gray-700"
-                                        aria-label="Copy address"
-                                      >
-                                        <BiCopy className="w-3 h-3" />
-                                      </button>
-                                    </div>
-                                  </div>
-                                )}
-                                
-                                {milestone.walletInfo.to && (
-                                  <div className="flex items-center mb-2">
-                                    <span className="text-xs text-gray-500 w-10">To:</span>
-                                    <div className="flex items-center flex-1 overflow-hidden">
-                                      <span className="text-xs font-mono bg-gray-100 py-1 px-2 rounded truncate max-w-[200px]">
-                                        {milestone.walletInfo.to.includes(': ')
-                                          ? milestone.walletInfo.to.split(': ')[0] + ': ' + truncateAddress(milestone.walletInfo.to.split(': ')[1])
-                                          : truncateAddress(milestone.walletInfo.to)
-                                        }
-                                      </span>
-                                      <button 
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleCopyToClipboard(milestone.walletInfo.to.split(': ')[1] || milestone.walletInfo.to);
-                                        }}
-                                        className="ml-1 text-gray-500 hover:text-gray-700"
-                                        aria-label="Copy address"
-                                      >
-                                        <BiCopy className="w-3 h-3" />
-                                      </button>
-                                    </div>
-                                  </div>
-                                )}
-                                
-                                {milestone.walletInfo.splits && (
-                                  <div className="ml-3 mt-2 border-l-2 border-gray-200 pl-2">
-                                    <span className="text-xs text-gray-500">Payment Split:</span>
-                                    {milestone.walletInfo.splits.map((split, i) => (
-                                      <div key={i} className="flex items-center mt-2">
-                                        <div className="flex-1 overflow-hidden">
-                                          <div className="flex items-center">
-                                            <span className="text-xs font-mono bg-gray-100 py-1 px-2 rounded truncate max-w-[200px]">
-                                              {split.to.includes(': ')
-                                                ? split.to.split(': ')[0] + ': ' + truncateAddress(split.to.split(': ')[1])
-                                                : truncateAddress(split.to)
-                                              }
-                                            </span>
-                                            <button 
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleCopyToClipboard(split.to.split(': ')[1] || split.to);
-                                              }}
-                                              className="ml-1 text-gray-500 hover:text-gray-700"
-                                              aria-label="Copy address"
-                                            >
-                                              <BiCopy className="w-3 h-3" />
-                                            </button>
-                                          </div>
-                                          <span className="text-xs text-gray-500 mt-1 block">{split.amount}</span>
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-                                
-                                {milestone.walletInfo.completionAction && (
-                                  <div className="text-xs text-gray-600 bg-gray-100 py-1 px-2 rounded mt-2">
-                                    {milestone.walletInfo.completionAction}
-                                  </div>
-                                )}
+                  )}
+                  
+                  {/* Child milestones */}
+                  {milestone.children && expandedMilestones[milestone.id] && (
+                    <div className="ml-16 mt-4 space-y-6">
+                      {milestone.children.map(child => (
+                        <div key={child.id} className="relative">
+                          {/* Child milestone header */}
+                          <div className="flex items-start">
+                            <div className="flex-shrink-0 h-8 w-8 rounded-full bg-white flex items-center justify-center border-2 border-gray-200">
+                              {getStatusIcon(child.status)}
+                            </div>
+                            <div className="ml-4 flex-grow">
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <h5 className="text-sm font-medium">{child.title}</h5>
+                                  <p className="text-xs text-gray-500">{child.date}</p>
+                                </div>
+                                <button 
+                                  onClick={() => toggleMilestoneExpand(child.id)}
+                                  className="text-gray-400 hover:text-gray-600"
+                                >
+                                  {expandedMilestones[child.id] ? (
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 15l7-7 7 7" />
+                                    </svg>
+                                  ) : (
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                  )}
+                                </button>
                               </div>
-                            )}
-                            
-                            {milestone.txHash && (
-                              <div>
-                                <div className="flex items-center justify-between">
-                                  <span className="text-xs text-gray-500">Transaction Hash:</span>
-                                  {copiedText === milestone.txHash && (
-                                    <span className="text-xs text-green-500">Copied!</span>
+                            </div>
+                          </div>
+                          
+                          {/* Child milestone details */}
+                          {expandedMilestones[child.id] && (
+                            <div className="ml-12 mt-2">
+                              <p className="text-xs text-gray-700 mb-2">{child.description}</p>
+                              
+                              {/* Wallet info for child */}
+                              {child.walletInfo && Object.keys(child.walletInfo).length > 0 && (
+                                <div className="bg-gray-50 rounded-md p-2 mb-2">
+                                  <h5 className="text-xs font-medium text-gray-700 mb-1">Transaction Details</h5>
+                                  {child.walletInfo.from && (
+                                    <div className="flex justify-between items-center mb-1">
+                                      <span className="text-xs text-gray-500">From:</span>
+                                      <div className="flex items-center">
+                                        <span className="text-xs font-medium">{truncateAddress(child.walletInfo.from)}</span>
+                                        <button 
+                                          onClick={() => handleCopyToClipboard(child.walletInfo.from)}
+                                          className="ml-1 text-gray-400 hover:text-gray-600"
+                                        >
+                                          <BiCopy size={12} />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )}
+                                  {child.walletInfo.to && (
+                                    <div className="flex justify-between items-center mb-1">
+                                      <span className="text-xs text-gray-500">To:</span>
+                                      <div className="flex items-center">
+                                        <span className="text-xs font-medium">{truncateAddress(child.walletInfo.to)}</span>
+                                        <button 
+                                          onClick={() => handleCopyToClipboard(child.walletInfo.to)}
+                                          className="ml-1 text-gray-400 hover:text-gray-600"
+                                        >
+                                          <BiCopy size={12} />
+                                        </button>
+                                      </div>
+                                    </div>
                                   )}
                                 </div>
-                                <div className="flex items-center mt-1">
-                                  <span className="text-xs font-mono bg-gray-100 py-1 px-2 rounded truncate max-w-[180px]">{truncateAddress(milestone.txHash)}</span>
+                              )}
+                              
+                              {/* Transaction info for child */}
+                              {child.txHash && (
+                                <div className="flex items-center mb-2">
+                                  <span className="text-xs text-gray-500 mr-2">Transaction:</span>
+                                  <span className="text-xs font-mono">{truncateAddress(child.txHash)}</span>
                                   <button 
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleCopyToClipboard(milestone.txHash);
-                                    }}
-                                    className="ml-1 text-gray-500 hover:text-gray-700"
-                                    aria-label="Copy transaction hash"
+                                    onClick={() => handleCopyToClipboard(child.txHash)}
+                                    className="ml-1 text-gray-400 hover:text-gray-600"
                                   >
-                                    <BiCopy className="w-3 h-3" />
+                                    <BiCopy size={12} />
                                   </button>
                                   <a 
-                                    href={getExplorerUrl(milestone.txHash)} 
+                                    href={getExplorerUrl(child.txHash)} 
                                     target="_blank" 
                                     rel="noopener noreferrer"
-                                    className="ml-1 text-blue-500 hover:text-blue-700"
-                                    aria-label="View transaction on explorer"
-                                    onClick={(e) => e.stopPropagation()}
+                                    className="ml-2 text-blue-500 hover:text-blue-700"
                                   >
-                                    <FiExternalLink className="w-3 h-3" />
+                                    <FiExternalLink size={12} />
                                   </a>
                                 </div>
-                              </div>
-                            )}
-                            
-                            {milestone.blockchainDetails && (
-                              <div className="mt-2">
-                                <span className="text-xs text-gray-500">Details:</span>
-                                <p className="text-xs text-gray-600 mt-1">{milestone.blockchainDetails}</p>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                        
-                        {/* Child items for repayment milestones - ALWAYS SHOWN for Repayment Period */}
-                        {milestone.children && (
-                          <div className="ml-4 mt-4 border-l-2 border-gray-200 pl-5 space-y-4">
-                            {milestone.children.map((child) => (
-                              <div key={child.id} className="relative">
-                                {/* Child milestone header */}
-                                <div 
-                                  className="flex items-center justify-between cursor-pointer"
-                                  onClick={() => toggleMilestoneExpand(child.id)}
-                                >
-                                  <div className="flex items-center">
-                                    <span className="mr-2">{child.icon}</span>
-                                    <h3 className="text-md font-medium">{child.title}</h3>
-                                    <span className={`ml-2 flex-shrink-0 h-2 w-2 rounded-full ${
-                                      child.status === 'completed' ? 'bg-green-500' : 
-                                      child.status === 'in-progress' ? 'bg-blue-500' : 
-                                      'bg-gray-300'
-                                    }`}></span>
-                                  </div>
-                                  {(child.walletInfo && Object.keys(child.walletInfo).length > 0 || child.txHash) && (
-                                    <button 
-                                      className={`text-gray-500 transition-transform duration-200 ${expandedMilestones[child.id] ? 'transform rotate-90' : ''}`}
-                                      aria-label={expandedMilestones[child.id] ? "Collapse details" : "Expand details"}
-                                    >
-                                      <IoArrowForward className="w-4 h-4" />
-                                    </button>
-                                  )}
-                                </div>
-                                
-                                {/* Child date/time info */}
-                                <div className="text-xs text-gray-500 mt-1 mb-1">
-                                  {child.date} {child.time && `• ${child.time}`}
-                                </div>
-                                
-                                {/* Child description */}
-                                <p className="text-gray-600 text-xs">{child.description}</p>
-                                
-                                {/* Child blockchain details (expandable) */}
-                                {expandedMilestones[child.id] && (child.walletInfo && Object.keys(child.walletInfo).length > 0 || child.txHash) && (
-                                  <div className="bg-gray-50 p-3 rounded-lg border border-gray-100 mt-2 text-sm">
-                                    {child.walletInfo && Object.keys(child.walletInfo).length > 0 && (
-                                      <div className="mb-3">
-                                        <h4 className="text-xs font-semibold text-gray-700 mb-2 flex items-center">
-                                          <IoLinkOutline className="mr-1" /> Blockchain Information
-                                        </h4>
-                                        
-                                        {child.walletInfo.from && (
-                                          <div className="flex items-center mb-2">
-                                            <span className="text-xs text-gray-500 w-10">From:</span>
-                                            <div className="flex items-center flex-1 overflow-hidden">
-                                              <span className="text-xs font-mono bg-gray-100 py-1 px-2 rounded truncate max-w-[200px]">
-                                                {child.walletInfo.from.includes(': ') 
-                                                  ? child.walletInfo.from.split(': ')[0] + ': ' + truncateAddress(child.walletInfo.from.split(': ')[1])
-                                                  : truncateAddress(child.walletInfo.from)
-                                                }
-                                              </span>
-                                              <button 
-                                                onClick={(e) => {
-                                                  e.stopPropagation();
-                                                  handleCopyToClipboard(child.walletInfo.from.split(': ')[1] || child.walletInfo.from);
-                                                }}
-                                                className="ml-1 text-gray-500 hover:text-gray-700"
-                                                aria-label="Copy address"
-                                              >
-                                                <BiCopy className="w-3 h-3" />
-                                              </button>
-                                            </div>
-                                          </div>
-                                        )}
-                                        
-                                        {child.walletInfo.to && (
-                                          <div className="flex items-center mb-2">
-                                            <span className="text-xs text-gray-500 w-10">To:</span>
-                                            <div className="flex items-center flex-1 overflow-hidden">
-                                              <span className="text-xs font-mono bg-gray-100 py-1 px-2 rounded truncate max-w-[200px]">
-                                                {child.walletInfo.to.includes(': ')
-                                                  ? child.walletInfo.to.split(': ')[0] + ': ' + truncateAddress(child.walletInfo.to.split(': ')[1])
-                                                  : truncateAddress(child.walletInfo.to)
-                                                }
-                                              </span>
-                                              <button 
-                                                onClick={(e) => {
-                                                  e.stopPropagation();
-                                                  handleCopyToClipboard(child.walletInfo.to.split(': ')[1] || child.walletInfo.to);
-                                                }}
-                                                className="ml-1 text-gray-500 hover:text-gray-700"
-                                                aria-label="Copy address"
-                                              >
-                                                <BiCopy className="w-3 h-3" />
-                                              </button>
-                                            </div>
-                                          </div>
-                                        )}
-                                        
-                                        {child.walletInfo.splits && (
-                                          <div className="ml-3 mt-2 border-l-2 border-gray-200 pl-2">
-                                            <span className="text-xs text-gray-500">Payment Split:</span>
-                                            {child.walletInfo.splits.map((split, i) => (
-                                              <div key={i} className="flex items-center mt-2">
-                                                <div className="flex-1 overflow-hidden">
-                                                  <div className="flex items-center">
-                                                    <span className="text-xs font-mono bg-gray-100 py-1 px-2 rounded truncate max-w-[200px]">
-                                                      {split.to.includes(': ')
-                                                        ? split.to.split(': ')[0] + ': ' + truncateAddress(split.to.split(': ')[1])
-                                                        : truncateAddress(split.to)
-                                                      }
-                                                    </span>
-                                                    <button 
-                                                      onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleCopyToClipboard(split.to.split(': ')[1] || split.to);
-                                                      }}
-                                                      className="ml-1 text-gray-500 hover:text-gray-700"
-                                                      aria-label="Copy address"
-                                                    >
-                                                      <BiCopy className="w-3 h-3" />
-                                                    </button>
-                                                  </div>
-                                                  <span className="text-xs text-gray-500 mt-1 block">{split.amount}</span>
-                                                </div>
-                                              </div>
-                                            ))}
-                                          </div>
-                                        )}
-                                      </div>
-                                    )}
-                                    
-                                    {child.txHash && (
-                                      <div>
-                                        <div className="flex items-center justify-between">
-                                          <span className="text-xs text-gray-500">Transaction Hash:</span>
-                                          {copiedText === child.txHash && (
-                                            <span className="text-xs text-green-500">Copied!</span>
-                                          )}
-                                        </div>
-                                        <div className="flex items-center mt-1">
-                                          <span className="text-xs font-mono bg-gray-100 py-1 px-2 rounded truncate max-w-[180px]">{truncateAddress(child.txHash)}</span>
-                                          <button 
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleCopyToClipboard(child.txHash);
-                                            }}
-                                            className="ml-1 text-gray-500 hover:text-gray-700"
-                                            aria-label="Copy transaction hash"
-                                          >
-                                            <BiCopy className="w-3 h-3" />
-                                          </button>
-                                          <a 
-                                            href={getExplorerUrl(child.txHash)} 
-                                            target="_blank" 
-                                            rel="noopener noreferrer"
-                                            className="ml-1 text-blue-500 hover:text-blue-700"
-                                            aria-label="View transaction on explorer"
-                                            onClick={(e) => e.stopPropagation()}
-                                          >
-                                            <FiExternalLink className="w-3 h-3" />
-                                          </a>
-                                        </div>
-                                      </div>
-                                    )}
-                                    
-                                    {child.blockchainDetails && (
-                                      <div className="mt-2">
-                                        <span className="text-xs text-gray-500">Details:</span>
-                                        <p className="text-xs text-gray-600 mt-1">{child.blockchainDetails}</p>
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </>
-                    )}
-                    
-                    {/* Separator line if not last item */}
-                    {index !== loanMilestones.length - 1 && (
-                      <div className="border-b border-gray-100 mt-4"></div>
-                    )}
-                  </div>
+                              )}
+                              
+                              {/* Blockchain info for child */}
+                              {child.blockchainDetails && (
+                                <p className="text-xs text-gray-600 italic">{child.blockchainDetails}</p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
           </div>
         </div>
+        
+        {/* Bottom action buttons */}
+        <div className="flex flex-col sm:flex-row gap-4">
+          {loanDetails?.isActive && !loanDetails?.isCompleted && (
+            <button 
+              onClick={() => navigate(`/repay/${loanDetails.publicKey || loanId}`, { state: { loan: loanDetails } })}
+              className="flex-1 bg-primary text-white py-3 px-6 rounded-lg font-semibold flex items-center justify-center hover:bg-primaryHover transition-colors"
+            >
+              <MdPayments className="mr-2" />
+              Make Payment
+            </button>
+          )}
+          <button 
+            onClick={handleBack}
+            className="flex-1 bg-gray-100 text-gray-800 py-3 px-6 rounded-lg font-semibold flex items-center justify-center hover:bg-gray-200 transition-colors"
+          >
+            <IoArrowBack className="mr-2" />
+            Back to Dashboard
+          </button>
+        </div>
+        
+        {/* Show copied notification */}
+        {copiedText && (
+          <div className="fixed bottom-4 right-4 bg-blue-500 text-white px-4 py-2 rounded-md shadow-lg text-sm">
+            Copied to clipboard!
+          </div>
+        )}
       </div>
     </HalfCircleBackground>
   );

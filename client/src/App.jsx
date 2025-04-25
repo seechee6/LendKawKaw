@@ -63,17 +63,25 @@ const AppContent = () => {
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<HomePage />} />
+            
+            {/* Loan application flow */}
             <Route path="/loan" element={<LoanPage />} />
-            <Route path="/lend" element={<LendPage />} />
             <Route path="/loan-confirmation" element={<LoanConfirmationPage />} />
             <Route path="/loan-success" element={<LoanSuccessPage />} />
-            <Route path="/transactions" element={<TransactionsPage />} />
+            <Route path="/loan-detail/:loanId" element={<LoanDetailPage />} />
+            
+            {/* Loan funding flow */}
+            <Route path="/lend" element={<LendPage />} />
             <Route path="/fund/:loanId" element={<LoanFundingPage />} />
             <Route path="/funding-review/:loanId" element={<FundingReviewPage />} />
             <Route path="/funding-success/:loanId" element={<LoanFundingSuccessPage />} />
-            <Route path="/loan-detail/:loanId" element={<LoanDetailPage />} />
+            
+            {/* Loan repayment flow */}
             <Route path="/repay/:loanId" element={<LoanRepaymentPage />} />
             <Route path="/review-summary/:loanId" element={<ReviewSummaryPage />} />
+            
+            {/* Other pages */}
+            <Route path="/transactions" element={<TransactionsPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/premium" element={<PremiumPage />} />
             <Route path="/credit-score" element={<CreditScorePage />} />

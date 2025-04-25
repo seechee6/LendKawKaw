@@ -5,17 +5,17 @@ import { Link } from 'react-router-dom';
 const WithdrawTutorialPage = () => {
   const steps = [
     {
-      title: "Convert Stablecoins (if needed)",
-      description: "If you have USDC or USDT, first convert them to ETH using Uniswap (app.uniswap.org). Connect your MetaMask, select the stablecoin, and swap to ETH.",
+      title: "Ensure You Have a Phantom Wallet",
+      description: "If you don't already have Phantom wallet installed, visit phantom.app to install and set up the extension for your browser. Make sure you have SOL in your wallet.",
       icon: (
         <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
         </svg>
       )
     },
     {
       title: "Create & Verify Luno Account",
-      description: "Sign up on Luno and complete the Malaysian ID verification (KYC). This is required for MYR withdrawals and typically takes 1-2 business days.",
+      description: "Sign up on Luno app and complete Malaysian ID verification (KYC). This is required for MYR withdrawals and typically takes 1-2 business days to be approved.",
       icon: (
         <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
@@ -23,8 +23,8 @@ const WithdrawTutorialPage = () => {
       )
     },
     {
-      title: "Get Luno ETH Address",
-      description: "In Luno, go to Portfolio → RECEIVE → ETH. Copy your unique Ethereum deposit address. Always verify it starts with '0x'.",
+      title: "Get Luno SOL Address",
+      description: "In Luno, go to Portfolio → Deposit → Solana (SOL). Copy your unique Solana deposit address and verify that it's correct.",
       icon: (
         <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -32,8 +32,8 @@ const WithdrawTutorialPage = () => {
       )
     },
     {
-      title: "Send from MetaMask",
-      description: "Open MetaMask → Send → Paste Luno's ETH address. Ensure you have enough ETH for gas fees (≈$5-20). Confirm and wait for 15-30 minutes.",
+      title: "Send from Phantom Wallet",
+      description: "Open Phantom → Click 'Send' → Paste Luno's SOL address. Ensure you have enough SOL for transaction fees (very minimal). Confirm and wait for the transaction to complete (usually 15-30 seconds).",
       icon: (
         <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
@@ -41,8 +41,8 @@ const WithdrawTutorialPage = () => {
       )
     },
     {
-      title: "Sell ETH for MYR",
-      description: "Once ETH arrives in Luno, go to Portfolio → ETH → SELL. Choose 'Instant Sell' for market rate or 'Advanced Trade' for limit orders.",
+      title: "Sell SOL for MYR",
+      description: "Once SOL arrives in Luno, go to Portfolio → SOL → SELL. Choose 'Instant Sell' for market rate or 'Simple Exchange' for the current market rate to convert to MYR.",
       icon: (
         <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -50,8 +50,8 @@ const WithdrawTutorialPage = () => {
       )
     },
     {
-      title: "Withdraw to Bank",
-      description: "Go to Portfolio → MYR → WITHDRAW. Link your Malaysian bank account if not done. Enter amount and confirm. Transfers complete in 1-2 business days.",
+      title: "Withdraw to Malaysian Bank Account",
+      description: "Go to Portfolio → MYR → WITHDRAW. Link your Malaysian bank account if not done already. Enter the amount you wish to withdraw and confirm. Bank transfers typically complete in 1-2 business days.",
       icon: (
         <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
@@ -64,7 +64,7 @@ const WithdrawTutorialPage = () => {
     <HalfCircleBackground title="How to Withdraw">
       <div className="max-w-3xl mx-auto pt-2">
         <div className="bg-white rounded-xl p-6 shadow-sm">
-          <h2 className="text-xl font-bold mb-6">Converting MetaMask Crypto to Malaysian Ringgit (MYR)</h2>
+          <h2 className="text-xl font-bold mb-6">Converting Solana to Malaysian Ringgit (MYR)</h2>
           
           <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-8">
             <div className="flex">
@@ -78,8 +78,9 @@ const WithdrawTutorialPage = () => {
                 <div className="mt-2 text-sm text-yellow-700">
                   <ul className="list-disc list-inside">
                     <li>Ensure you have completed Luno's KYC verification</li>
-                    <li>Keep extra ETH for gas fees (≈$5-20)</li>
-                    <li>Only send ETH or supported cryptocurrencies to Luno</li>
+                    <li>Keep a small amount of SOL for transaction fees</li>
+                    <li>Only send SOL or other supported cryptocurrencies to Luno</li>
+                    <li>Make sure you have a Malaysian bank account linked to Luno</li>
                   </ul>
                 </div>
               </div>
@@ -110,12 +111,12 @@ const WithdrawTutorialPage = () => {
               Important Safety Tips
             </h4>
             <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
-              <li>Triple-check all wallet addresses before sending any crypto</li>
-              <li>Never share your private keys or seed phrases with anyone</li>
-              <li>Enable 2FA on both MetaMask and Luno accounts</li>
-              <li>Consider market prices and exchange rates before selling</li>
+              <li>Triple-check all wallet addresses before sending any SOL</li>
+              <li>Never share your Phantom wallet seed phrase with anyone</li>
+              <li>Enable two-factor authentication (2FA) on your Luno account</li>
+              <li>Consider market prices before selling for the best exchange rate</li>
               <li>Keep transaction records for tax purposes</li>
-              <li>Start with a small test transaction if unsure</li>
+              <li>Start with a small test transaction if you're unsure</li>
             </ul>
           </div>
 

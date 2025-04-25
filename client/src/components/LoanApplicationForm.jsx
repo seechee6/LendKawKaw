@@ -4,8 +4,8 @@ import { HiChevronDown, HiChevronUp } from 'react-icons/hi';
 import { useNavigate } from 'react-router-dom';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
-import { createLoanOnChain, initializeProgramDataIfNeeded, getProgramDataPDA } from '../services/solanaService';
 import { toast } from 'react-hot-toast';
+import { createLoan, checkUserInitialized, initializeUser } from '../utils/solanaLoanUtils';
 
 // Add a separate component for program initialization
 const InitializeButton = ({ onInitialize, isLoading }) => {
@@ -217,234 +217,151 @@ const LoanApplicationForm = () => {
     setIsGuarantorDropdownOpen(false);
   };
 
-  // Check if program is initialized on component mount
+  // Check if the user's blockchain account is initialized
   useEffect(() => {
     const checkProgramInitialized = async () => {
-      if (!wallet.connected) return;
+      if (!wallet.connected || !connection) return;
       
       try {
-        const { pda } = await getProgramDataPDA();
-        const programDataAccount = await connection.getAccountInfo(pda);
-        setProgramInitialized(!!programDataAccount);
+        setIsInitializing(true);
+        const { isInitialized } = await checkUserInitialized(connection, wallet);
+        setProgramInitialized(isInitialized);
       } catch (error) {
-        console.error("Error checking program initialization:", error);
+        console.error("Error checking initialization:", error);
         setProgramInitialized(false);
+      } finally {
+        setIsInitializing(false);
       }
     };
     
-    checkProgramInitialized();
-  }, [wallet.connected, connection]);
-  
-  // Initialize program data separately
-  const handleInitializeProgram = async () => {
-    if (!wallet.connected) {
-      toast.error("Please connect your wallet first");
-      return false;
+    if (wallet.connected) {
+      checkProgramInitialized();
+    } else {
+      setProgramInitialized(null);
     }
-    
-    setIsInitializing(true);
-    const loadingToast = toast.loading("Initializing blockchain program...");
-    
-    try {
-      // Make sure we have enough SOL first
-      const balance = await connection.getBalance(wallet.publicKey);
-      const balanceInSol = balance / 1000000000; // Convert lamports to SOL
-      
-      if (balanceInSol < 0.1) {
-        toast.dismiss(loadingToast);
-        toast.error(`Your wallet has insufficient SOL (${balanceInSol.toFixed(4)} SOL). Need at least 0.1 SOL.`);
-        return false;
-      }
-      
-      // First check if it's already initialized to avoid unnecessary transactions
-      try {
-        const { pda } = await getProgramDataPDA();
-        const programDataAccount = await connection.getAccountInfo(pda);
-        
-        if (programDataAccount) {
-          toast.dismiss(loadingToast);
-          toast.success("Program is already initialized!");
-          setProgramInitialized(true);
-          return true;
-        }
-      } catch (checkError) {
-        console.error("Error checking program status:", checkError);
-      }
-      
-      // Try the initialization
-      const initResult = await initializeProgramDataIfNeeded(connection, wallet);
-      
-      // Verify the program was initialized
-      const programDataPubkey = initResult.programDataPubkey;
-      const verifyAccount = await connection.getAccountInfo(programDataPubkey);
-      
-      if (!verifyAccount) {
-        throw new Error("Program initialization transaction completed, but the account wasn't created");
-      }
-      
-      toast.dismiss(loadingToast);
-      toast.success("Program initialized successfully!");
-      setProgramInitialized(true);
-      return true;
-    } catch (error) {
-      toast.dismiss(loadingToast);
-      console.error("Error initializing program:", error);
-      
-      // Extract the most useful part of the error message
-      let errorMessage = "Unknown error occurred";
-      
-      if (error.message) {
-        // Check for specific error patterns
-        if (error.message.includes("unauthorized signer")) {
-          errorMessage = "Authorization error: The program account could not be created. Try a different wallet.";
-        } else if (error.message.includes("insufficient")) {
-          errorMessage = "Insufficient SOL in your wallet for this transaction.";
-        } else if (error.message.includes("Transaction simulation failed")) {
-          errorMessage = "Transaction simulation failed. This may be due to network congestion. Please try again.";
-        } else if (error.message.includes("timed out")) {
-          errorMessage = "Transaction timed out. The network may be congested. Please try again.";
-        } else {
-          // Get the most relevant part of the error message
-          errorMessage = error.message.split('\n')[0].slice(0, 100);
-        }
-      }
-      
-      // If we have logs, try to extract more specific error information
-      if (error.logs && Array.isArray(error.logs)) {
-        // Look for specific error messages in the logs
-        const errorLogs = error.logs.filter(log => 
-          log.includes("Error") || 
-          log.includes("error") || 
-          log.includes("failed")
-        );
-        
-        if (errorLogs.length > 0) {
-          // Use the most specific error we can find
-          const mostSpecificLog = errorLogs[errorLogs.length - 1];
-          console.log("Most specific error log:", mostSpecificLog);
-          
-          if (mostSpecificLog.includes("signer privilege escalated")) {
-            errorMessage = "Permission error: The transaction requires elevated permissions.";
-          } else if (mostSpecificLog.includes("InstructionFallbackNotFound")) {
-            errorMessage = "Contract error: The function you're trying to call doesn't exist.";
-          }
-        }
-      }
-      
-      toast.error(`Initialization failed: ${errorMessage}`);
-      setProgramInitialized(false);
-      return false;
-    } finally {
-      setIsInitializing(false);
-    }
-  };
+  }, [wallet.connected, connection, wallet.publicKey]);
 
-  // Handle apply button click
-  const handleApply = async () => {
+  // Initialize the user's blockchain account
+  const handleInitializeProgram = async () => {
     if (!wallet.connected) {
       toast.error("Please connect your wallet first");
       return;
     }
     
-    if (isSubmitting) return;
+    setIsInitializing(true);
+    
+    try {
+      const result = await initializeUser(connection, wallet);
+      
+      if (result.success) {
+        setProgramInitialized(true);
+        toast.success("Your account has been initialized on the blockchain!");
+      } else {
+        toast.error(result.message || "Failed to initialize. Please try again.");
+      }
+    } catch (error) {
+      console.error("Error initializing:", error);
+      toast.error("Failed to initialize. Please try again.");
+    } finally {
+      setIsInitializing(false);
+    }
+  };
+
+  // Submit the loan application
+  const handleApply = async () => {
+    if (isSubmitting) return; // Prevent double submission
+    
+    if (!purpose.trim()) {
+      toast.error("Please provide a purpose for the loan");
+      return;
+    }
+    
     setIsSubmitting(true);
     
     try {
-      // Basic validation
-      if (loanAmount < 0.001) {
-        toast.error("Loan amount must be at least 0.001 SOL");
-        setIsSubmitting(false);
-        return;
-      }
-      
-      if (repaymentPeriod < 1) {
-        toast.error("Repayment period must be at least 1 month");
-        setIsSubmitting(false);
-        return;
-      }
-      
-      // Create loan data object
-      const loanData = {
-        loanAmount: parseFloat(loanAmount) / 1000, // Convert to SOL (dividing by 1000 because our UI shows RM 1000 = 1 SOL)
-        repaymentPeriod: parseInt(repaymentPeriod),
-        purpose: purpose || (loanType === 'personal' ? 'Personal Loan' : 'Business Loan'),
-        installmentAmount,
-        interestRate: 6, // 6% interest rate
-        guarantor: isGuarantorEnabled ? guarantorId : null,
-        guarantorName: isGuarantorEnabled && guarantorId ? getGuarantorDisplayName() : null,
-        hasGuarantor: isGuarantorEnabled && guarantorId ? true : false,
-        totalAmount: loanAmount,
-        monthlyPayment: installmentAmount,
-        term: `${repaymentPeriod} months`,
-        title: `${loanType === 'personal' ? 'Personal' : 'Business'} Loan`,
-        dueDate: calculateRepaymentDate(),
-        interest: fees,
-        protectionFee: protectionFee,
-        totalWithFees: totalLoanAmount,
-        status: isGuarantorEnabled && guarantorId ? 'pending guarantor' : 'pending'
-      };
-      
-      // First check wallet balance
-      const balance = await connection.getBalance(wallet.publicKey);
-      const balanceInSol = balance / 1000000000; // Convert lamports to SOL
-      
-      if (balanceInSol < 0.1) {
-        toast.error(`Your wallet has insufficient SOL (${balanceInSol.toFixed(4)} SOL). Need at least 0.1 SOL.`);
-        setIsSubmitting(false);
-        return;
-      }
-      
-      // Store loan on blockchain
-      const loadingToast = toast.loading("Creating loan on blockchain...");
-      
-      try {
-        // Create the loan
-        const result = await createLoanOnChain(connection, wallet, loanData);
+      // If wallet is connected, try to use blockchain
+      if (wallet.connected && connection) {
+        // Display a loading toast
+        const loadingToast = toast.loading("Creating loan on blockchain...");
         
-        toast.dismiss(loadingToast);
-        
-        if (!result || !result.signature || !result.loanPublicKey) {
-          throw new Error("Failed to create loan: missing transaction details");
-        }
-        
-        // Add blockchain information to loan data
-        loanData.signature = result.signature;
-        loanData.loanPublicKey = result.loanPublicKey;
-        
-        toast.success("Loan successfully created on blockchain!");
-        
-        // Navigate to success page with loan data
-        navigate('/loan-success', { state: { loan: loanData } });
-      } catch (blockchainError) {
-        toast.dismiss(loadingToast);
-        console.error("Blockchain error:", blockchainError);
-        
-        // If program needs initialization
-        if (blockchainError.message && blockchainError.message.includes("needs to be initialized first")) {
-          toast.error("Program needs initialization before creating a loan");
+        try {
+          // Calculate the SOL equivalent of the loan amount (1 SOL = 661.62 RM)
+          const solAmount = loanAmount / 661.62;
+          console.log(`Converting ${loanAmount} RM to ${solAmount.toFixed(4)} SOL`);
           
-          // Ask user if they want to initialize program
-          if (window.confirm("The blockchain program needs to be set up first. Would you like to initialize it now?")) {
-            const success = await handleInitializeProgram();
-            if (success) {
-              toast("Program initialized. Please try creating your loan again.");
-            }
+          // Create loan on blockchain with actual values
+          const result = await createLoan(
+            connection,
+            wallet,
+            solAmount, // Convert RM to SOL based on current exchange rate (661.62 RM = 1 SOL)
+            8, // 8% interest rate
+            repaymentPeriod // Duration in months
+          );
+          
+          toast.dismiss(loadingToast);
+          
+          if (result.success) {
+            toast.success("Loan created successfully on the blockchain!");
+            
+            // Navigate to success screen with blockchain details
+            navigate('/loan-success', {
+              state: {
+                loanDetails: {
+                  amount: loanAmount,
+                  term: repaymentPeriod,
+                  installment: installmentAmount,
+                  protectionFee: protectionFee,
+                  totalAmount: totalLoanAmount,
+                  repaymentDate: calculateRepaymentDate(),
+                  loanId: result.loanId,
+                  loanAddress: result.loanAddress,
+                  transactionSignature: result.signature,
+                  isBlockchainLoan: true,
+                  purpose: purpose, // Still include purpose in the state for UI display
+                  solAmount: solAmount // Add the SOL amount for reference
+                }
+              }
+            });
+            return;
+          } else {
+            toast.error(result.message || "Failed to create loan on blockchain");
           }
-        } else if (blockchainError.message && blockchainError.message.includes("insufficient funds")) {
-          toast.error(`Insufficient SOL in your wallet. Add funds and try again.`);
-        } else if (blockchainError.message && blockchainError.message.includes("unauthorized signer")) {
-          toast.error(`Permission denied. The current wallet cannot perform this action.`);
-        } else {
-          toast.error(`Transaction error: ${blockchainError.message?.slice(0, 100) || "Unknown error"}`);
+        } catch (error) {
+          toast.dismiss(loadingToast);
+          console.error("Blockchain error:", error);
+          toast.error("Blockchain transaction failed. Falling back to simulated loan.");
         }
-        
-        setIsSubmitting(false);
-        return;
       }
+      
+      // For non-connected wallets or fallback, use the existing logic
+      // Simulate API call to the backend (replace with actual API call)
+      setTimeout(() => {
+        // Show an "approval" message
+        const loadingToast = toast.loading("Processing loan application...");
+        
+        setTimeout(() => {
+          toast.dismiss(loadingToast);
+          toast.success("Loan application approved!");
+          
+          // Navigate to success screen
+          navigate('/loan-success', {
+            state: {
+              loanDetails: {
+                amount: loanAmount,
+                term: repaymentPeriod,
+                installment: installmentAmount,
+                protectionFee: protectionFee,
+                totalAmount: totalLoanAmount,
+                repaymentDate: calculateRepaymentDate(),
+                isBlockchainLoan: false
+              }
+            }
+          });
+        }, 2000); // 2-second fake "processing" time
+      }, 1000);
     } catch (error) {
-      console.error("Error applying for loan:", error);
-      toast.dismiss();
-      toast.error("Failed to create loan. Please try again.");
+      console.error("Application error:", error);
+      toast.error("Failed to submit loan application. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -675,6 +592,19 @@ const LoanApplicationForm = () => {
               {months} Months
             </button>
           ))}
+        </div>
+      </div>
+
+            {/* Borrower Protection Fee Disclaimer */}
+            <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-100">
+        <div className="flex items-start">
+          <svg className="w-5 h-5 text-blue-600 mt-0.5 mr-2 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+          </svg>
+          <div>
+            <h4 className="font-medium text-blue-700 text-sm">Important Notice</h4>
+            <p className="text-blue-600 text-xs mt-1">A 5% protection fee will be automatically deducted from your loan amount before you receive the funds. This fee is held in reserve to protect lenders in case of default.</p>
+          </div>
         </div>
       </div>
 

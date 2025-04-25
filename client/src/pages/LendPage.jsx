@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { HalfCircleBackground } from '../components';
-import { FiChevronDown, FiChevronUp, FiLock, FiRefreshCw } from 'react-icons/fi';
+import { FiChevronDown, FiChevronUp, FiLock, FiInfo } from 'react-icons/fi';
 import { Link } from 'react-router-dom';
 import { HiOutlineEye, HiOutlineUser, HiOutlineCash, HiOutlineCalendar, HiOutlineBadgeCheck, HiOutlineChartBar, HiOutlineLightningBolt, HiOutlineSparkles } from 'react-icons/hi';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
-import { fetchAvailableLoansFromChain } from '../services/solanaService';
 import { toast } from 'react-hot-toast';
+import { fetchAvailableLoans } from '../utils/solanaLoanUtils';
 
 const LendPage = () => {
   const { publicKey } = useWallet();
@@ -19,32 +19,42 @@ const LendPage = () => {
   const [expandedCards, setExpandedCards] = useState({});
   const [showingInsights, setShowingInsights] = useState({});
   const [isPremium] = useState(true); // In a real app, this would come from a context or API
-  const [showMockData, setShowMockData] = useState(true);
   
+  // Fetch loans when component mounts or connection changes
   useEffect(() => {
     fetchLoanApplications();
-  }, [connection, showMockData]);
+    
+    // Auto-refresh every 30 seconds
+    const refreshInterval = setInterval(() => {
+      fetchLoanApplications(false); // Pass false to not show loading indicator for auto-refresh
+    }, 30000);
+    
+    // Cleanup interval on component unmount
+    return () => clearInterval(refreshInterval);
+  }, [connection]);
 
-  const fetchLoanApplications = async () => {
-    setIsLoading(true);
+  const fetchLoanApplications = async (showLoader = true) => {
+    if (showLoader) {
+      setIsLoading(true);
+    }
+    
     try {
-      let loans = [];
-      
-      // Try to fetch blockchain loans if connection is available
+      // Only fetch blockchain loans if connection is available
       if (connection) {
         try {
-          const blockchainLoans = await fetchAvailableLoansFromChain(connection);
+          const blockchainLoans = await fetchAvailableLoans(connection);
           console.log("Blockchain loans:", blockchainLoans);
           
           // Transform blockchain loan data to match our UI format
-          loans = blockchainLoans.map(loan => ({
+          const loans = blockchainLoans.map(loan => ({
             id: loan.id,
             publicKey: loan.publicKey, // We'll need this to fund the loan
             title: loan.description || 'Loan Application',
             borrower: loan.borrower,
             requestDate: new Date().toLocaleDateString(), // Blockchain doesn't have this info
-            requestedAmount: loan.amount,
-            monthlyPayment: (parseFloat(loan.amount) / parseInt(loan.duration)).toFixed(2),
+            requestedAmount: parseFloat(loan.amount) * 661.62, // Convert SOL to RM (1 SOL = 661.62 RM)
+            solAmount: parseFloat(loan.amount), // Keep the original SOL amount
+            monthlyPayment: (parseFloat(loan.amount) * 661.62 / parseInt(loan.duration)).toFixed(2), // Calculate in RM
             purpose: loan.description,
             proposedInterest: `${loan.interestRate}%`,
             term: `${loan.duration} months`,
@@ -56,105 +66,22 @@ const LendPage = () => {
             onTimePayment: 95,
             previousLoans: 1,
             estimatedROI: parseFloat(loan.interestRate),
-            isBlockchainLoan: true
           }));
+          
+          setLoanApplications(loans);
         } catch (error) {
           console.error("Error fetching blockchain loans:", error);
-          toast.error("Failed to fetch blockchain loans");
+          if (showLoader) {
+            toast.error("Failed to fetch blockchain loans");
+          }
         }
       }
-      
-      // Add mock data if enabled
-      if (showMockData) {
-        const mockLoans = [
-          {
-            id: 'mock-1',
-            title: 'Small Business Loan',
-            borrower: '0x7e...1A3b',
-            requestDate: 'Mar 19, 2024',
-            requestedAmount: '45,000',
-            monthlyPayment: '5,000',
-            purpose: 'Business Expansion',
-            proposedInterest: '6.5%',
-            term: '12 months',
-            risk: 'low',
-            collateralOffered: 'Business Equipment',
-            creditScore: '720',
-            status: 'pending',
-            riskScore: 28,
-            onTimePayment: 97,
-            previousLoans: 3,
-            estimatedROI: 6.5,
-            premiumInsights: {
-              borrowerRepaymentRate: 97,
-              latePaymentFrequency: 2.5,
-              defaultRisk: 'Very Low',
-              similarLoansPerformance: 98.2,
-              borrowerHistory: [
-                { amount: '12,000', status: 'Completed', onTime: true },
-                { amount: '8,500', status: 'Completed', onTime: true },
-                { amount: '5,000', status: 'Completed', onTime: false }
-              ]
-            }
-          },
-          {
-            id: 'mock-2',
-            title: 'Education Loan',
-            borrower: '0x3D...F28c',
-            requestDate: 'Mar 18, 2024',
-            requestedAmount: '45,000',
-            monthlyPayment: '5,000',
-            purpose: 'University Tuition',
-            proposedInterest: '6.5%',
-            term: '24 months',
-            risk: 'low',
-            collateralOffered: 'None',
-            creditScore: '750',
-            status: 'pending',
-            riskScore: 15,
-            onTimePayment: 100,
-            previousLoans: 2,
-            estimatedROI: 6.5,
-            premiumInsights: {
-              borrowerRepaymentRate: 100,
-              latePaymentFrequency: 0,
-              defaultRisk: 'Minimal',
-              similarLoansPerformance: 99.5,
-              borrowerHistory: [
-                { amount: '10,000', status: 'Completed', onTime: true },
-                { amount: '15,000', status: 'Completed', onTime: true }
-              ]
-            }
-          },
-          {
-            id: 'mock-3',
-            title: 'Home Improvement',
-            borrower: '0x9A...B45d',
-            requestDate: 'Mar 17, 2024',
-            requestedAmount: '45,000',
-            monthlyPayment: '5,000',
-            purpose: 'Kitchen Renovation',
-            proposedInterest: '6.5%',
-            term: '6 months',
-            risk: 'high',
-            collateralOffered: 'Property Lien',
-            creditScore: '680',
-            status: 'pending',
-            riskScore: 65,
-            onTimePayment: 86,
-            previousLoans: 3,
-            estimatedROI: 6.5
-          }
-        ];
-        
-        loans = [...loans, ...mockLoans];
-      }
-      
-      setLoanApplications(loans);
     } catch (error) {
       console.error("Error fetching loan applications:", error);
     } finally {
-      setIsLoading(false);
+      if (showLoader) {
+        setIsLoading(false);
+      }
     }
   };
   
@@ -182,13 +109,12 @@ const LendPage = () => {
       navigate(`/fund/${loan.id}`, { 
         state: { 
           loan,
-          isBlockchainLoan: true,
           loanPublicKey: loan.publicKey,
           borrowerPublicKey: loan.borrower
         }
       });
     } else {
-      // For mock loans, pass the loan data as before
+      // For non-blockchain loans, pass the loan data as before
       navigate(`/fund/${loan.id}`, { state: { loan } });
     }
   };
@@ -206,14 +132,14 @@ const LendPage = () => {
       [id]: !prev[id]
     }));
   };
-  
-  const toggleMockData = () => {
-    setShowMockData(!showMockData);
-  };
 
   const filteredApplications = loanApplications.filter(loan => {
     if (filter === 'all') return true;
     if (filter === 'low-risk') return loan.risk === 'low';
+    if (filter === 'low-amount') {
+      // Sort by amount would happen in the sort function below
+      return true;
+    }
     return true;
   }).sort((a, b) => {
     if (filter === 'low-amount') {
@@ -263,20 +189,6 @@ const LendPage = () => {
                   Low Amount
                 </button>
               </div>
-              <div className="flex space-x-2 w-full sm:w-auto justify-end">
-                <button
-                  onClick={toggleMockData}
-                  className="px-3 py-1.5 rounded-full text-xs font-medium bg-white shadow-sm text-gray-700 hover:bg-gray-100 flex items-center"
-                >
-                  {showMockData ? "Hide Mock" : "Show Mock"}
-                </button>
-                <button
-                  onClick={fetchLoanApplications}
-                  className="flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-white shadow-sm text-gray-700 hover:bg-gray-100"
-                >
-                  <FiRefreshCw size={14} className="mr-1" /> Refresh
-                </button>
-              </div>
             </div>
 
             {isLoading ? (
@@ -293,12 +205,6 @@ const LendPage = () => {
                   <div key={loan.id} className="relative">
                     {/* Card container */}
                     <div className="bg-white rounded-xl shadow-sm mb-4 relative">
-                      {loan.isBlockchainLoan && (
-                        <div className="absolute top-2 right-2 bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full z-10">
-                          On-Chain
-                        </div>
-                      )}
-                      
                       {!showingInsights[loan.id] ? (
                         // Front of card - Main loan details
                         <div className="p-4">
@@ -319,7 +225,7 @@ const LendPage = () => {
                           <div className="grid grid-cols-2 gap-4 mt-2">
                             <div>
                               <p className="text-sm text-gray-500">Requested Amount</p>
-                              <p className="text-xl font-semibold text-secondary">RM {loan.requestedAmount}</p>
+                              <p className="text-xl font-semibold text-secondary">RM {typeof loan.requestedAmount === 'number' ? loan.requestedAmount.toFixed(2) : loan.requestedAmount}</p>
                             </div>
                             <div>
                               <p className="text-sm text-gray-500">Monthly Payment</p>
@@ -390,6 +296,17 @@ const LendPage = () => {
                                 </div>
                               </div>
                               
+                              {/* Lender Protection Fee Disclaimer - Now positioned below the term section */}
+                              <div className="mb-4 mt-1 bg-blue-50 border-l-4 border-blue-500 p-3 rounded">
+                                <div className="flex items-start">
+                                  <FiInfo className="text-blue-500 mt-0.5 mr-2 flex-shrink-0" size={16} />
+                                  <div>
+                                    <h4 className="font-medium text-blue-700 text-xs">Lender Protection Notice</h4>
+                                    <p className="text-blue-600 text-xs mt-0.5">A 5% protection fee will be deducted from the loan amount before disbursement to protect you in case of default.</p>
+                                  </div>
+                                </div>
+                              </div>
+                              
                               <div className="grid grid-cols-2 gap-4 mb-4">
                                 <div>
                                   <p className="text-sm text-gray-500">Purpose</p>
@@ -401,12 +318,10 @@ const LendPage = () => {
                                 </div>
                               </div>
                               
-                              {loan.isBlockchainLoan && (
-                                <div className="mt-2 text-xs text-gray-500">
-                                  <p>Loan ID: {loan.id}</p>
-                                  <p className="truncate">Borrower: {loan.borrower}</p>
-                                </div>
-                              )}
+                              <div className="mt-2 text-xs text-gray-500">
+                                <p>Loan ID: {loan.id}</p>
+                                <p className="truncate">Borrower: {loan.borrower}</p>
+                              </div>
                             </div>
                           )}
                         </div>
@@ -462,15 +377,8 @@ const LendPage = () => {
                               <div className="flex items-center text-gray-700">
                                 <HiOutlineCash className="mr-2 text-purple-600" /> Est. ROI
                               </div>
-                              <span className="font-medium text-green-600">{loan.estimatedROI || (loan.interestRate - 2)}%</span>
+                              <span className="font-medium text-green-600">{loan.estimatedROI || (parseFloat(loan.proposedInterest) - 2)}%</span>
                             </div>
-                            
-                            {loan.isBlockchainLoan && (
-                              <div className="mt-2 bg-blue-50 p-2 rounded-md text-sm text-blue-700">
-                                <p className="font-medium">On-Chain Loan</p>
-                                <p className="text-xs">When you fund this loan, the transaction will be recorded on the Solana blockchain.</p>
-                              </div>
-                            )}
                           </div>
                         </div>
                       )}

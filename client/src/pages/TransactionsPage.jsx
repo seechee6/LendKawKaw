@@ -5,12 +5,13 @@ import { TransactionContext } from '../context/TransactionContext';
 import { shortenAddress } from '../utils/shortenAddress';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { toast } from 'react-hot-toast';
 
-// Helper function to add delay between API calls
+// Helper function to add delay between API calls for rate limiting
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 // Exponential backoff implementation for retries
-const backoffRetry = async (fn, maxRetries = 5, initialDelay = 1000) => {
+const backoffRetry = async (fn, maxRetries = 3, initialDelay = 500) => {
   let retries = 0;
   
   const execute = async () => {
@@ -30,41 +31,6 @@ const backoffRetry = async (fn, maxRetries = 5, initialDelay = 1000) => {
   };
   
   return execute();
-};
-
-// Helper function to process transactions in batches with rate limiting
-const processBatch = async (items, processFn, batchSize = 2, delayMs = 1500) => {
-  const results = [];
-  
-  for (let i = 0; i < items.length; i += batchSize) {
-    console.log(`Processing batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(items.length/batchSize)}`);
-    
-    const batch = items.slice(i, i + batchSize);
-    
-    // Process items in current batch sequentially to avoid parallel requests
-    for (const item of batch) {
-      try {
-        const result = await processFn(item);
-        results.push(result);
-      } catch (error) {
-        console.error(`Error processing batch item:`, error);
-        results.push({ error, tx: null });
-      }
-      
-      // Add a small delay between each item in the batch
-      if (batch.indexOf(item) < batch.length - 1) {
-        await delay(500);
-      }
-    }
-    
-    // Add delay between batches to avoid rate limiting
-    if (i + batchSize < items.length) {
-      console.log(`Waiting ${delayMs}ms before next batch...`);
-      await delay(delayMs);
-    }
-  }
-  
-  return results;
 };
 
 const TransactionsPage = () => {
@@ -110,60 +76,97 @@ const TransactionsPage = () => {
       setFetchError(null);
       setFetchProgress(0);
       
-      // Limit the number of signatures we fetch initially
-      const limit = 5;
-      console.log(`Fetching signatures for ${publicKey.toString()} (limit: ${limit})...`);
+      // Get maximum limit of transactions we can fetch (10 is a safe value)
+      const limit = 10; 
+      const loadingToast = toast.loading(`Loading your transactions...`);
       
       // Fetch signatures for the wallet's transactions
-      const signatures = await backoffRetry(() => 
-        connection.getSignaturesForAddress(publicKey, { limit }, 'confirmed')
+      setFetchProgress(5);
+      console.log(`Fetching signatures for ${publicKey.toString()} (limit: ${limit})...`);
+      
+      const signatures = await connection.getSignaturesForAddress(
+        publicKey, 
+        { limit }, 
+        'confirmed'
       );
       
       console.log(`Found ${signatures.length} transaction signatures`);
-      setFetchProgress(10);
+      setFetchProgress(25);
       
       if (signatures.length === 0) {
+        toast.dismiss(loadingToast);
+        toast.success('No transactions found');
         setWalletTransactions([]);
         setIsLoadingHistory(false);
         return;
       }
       
-      // Process signatures sequentially to avoid rate limiting
-      const processSignature = async (sig) => {
+      // Process all transactions at once without batching
+      setFetchProgress(30);
+      
+      // Fetch all transactions in parallel with a small concurrency limit
+      // We'll use Promise.all but with a limited concurrency pool
+      const fetchTransactionWithRetry = async (signature) => {
         try {
-          const getTx = async () => {
-            return await connection.getTransaction(sig.signature, {
+          return await backoffRetry(() => 
+            connection.getTransaction(signature, {
               maxSupportedTransactionVersion: 0
-            });
-          };
-          
-          const tx = await backoffRetry(getTx);
-          return { signature: sig.signature, tx };
+            })
+          );
         } catch (error) {
-          console.error(`Failed to fetch transaction ${sig.signature} after retries:`, error);
-          return { signature: sig.signature, tx: null };
+          console.error(`Error fetching transaction ${signature}:`, error);
+          return null;
         }
       };
       
-      // Process signatures in batches with delay between each batch
-      const transactionDetails = await processBatch(
-        signatures,
-        processSignature,
-        1,  // Process 1 transaction at a time
-        2000 // Wait 2 seconds between transactions
+      // Helper for limiting concurrency
+      const limitConcurrency = async (items, concurrencyLimit, processFn) => {
+        const results = [];
+        const running = new Set();
+        
+        // Create a Promise that resolves after processing each item
+        for (const [index, item] of items.entries()) {
+          // If we've reached the concurrency limit, wait for one task to complete
+          if (running.size >= concurrencyLimit) {
+            await Promise.race(running);
+          }
+          
+          // Create a promise for processing this item
+          const promise = (async () => {
+            try {
+              setFetchProgress(30 + Math.floor((index / items.length) * 40));
+              return await processFn(item);
+            } finally {
+              running.delete(promise);
+            }
+          })();
+          
+          running.add(promise);
+          results.push(promise);
+        }
+        
+        // Wait for all remaining tasks to complete
+        return Promise.all(results);
+      };
+      
+      // Fetch transactions with limited concurrency (3 at a time)
+      const transactions = await limitConcurrency(
+        signatures.map(sig => sig.signature),
+        3,  // Process 3 transactions concurrently
+        fetchTransactionWithRetry
       );
       
-      setFetchProgress(60);
+      setFetchProgress(70);
       
       // Format the transactions
-      console.log(`Formatting ${transactionDetails.filter(item => item.tx !== null).length} transactions...`);
+      console.log(`Formatting ${transactions.filter(tx => tx !== null).length} transactions...`);
       
-      const formattedTransactions = transactionDetails
-        .filter(item => item.tx !== null)
-        .map((item, index) => {
-          setFetchProgress(60 + Math.floor((index / transactionDetails.length) * 30));
+      const formattedTransactions = transactions
+        .map((tx, index) => {
+          if (!tx) return null;
           
-          const { tx, signature } = item;
+          const signature = signatures[index].signature;
+          setFetchProgress(70 + Math.floor((index / transactions.length) * 25));
           
           try {
             // Check if transaction has necessary data
@@ -240,6 +243,9 @@ const TransactionsPage = () => {
         
         // Calculate transaction summary after setting wallet transactions
         calculateTransactionSummary(formattedTransactions);
+        
+        toast.dismiss(loadingToast);
+        toast.success(`Loaded ${formattedTransactions.length} transactions`);
       }
     } catch (error) {
       console.error("Error fetching wallet transactions:", error);
@@ -250,8 +256,10 @@ const TransactionsPage = () => {
         // Set user-friendly error message
         if (error.message && error.message.includes('429')) {
           setFetchError("Rate limit exceeded. Please try again in a moment.");
+          toast.error("Rate limit exceeded. Please try again in a moment.");
         } else {
           setFetchError("Failed to load transactions. Please try again later.");
+          toast.error("Failed to load transactions");
         }
       }
     }
@@ -364,13 +372,17 @@ const TransactionsPage = () => {
             <div className="flex flex-col justify-center items-center py-8">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-700 mb-4"></div>
               <p className="text-gray-600 mb-2">Loading transactions... {fetchProgress}%</p>
-              <div className="w-64 h-2 bg-gray-200 rounded-full">
+              <div className="w-64 h-2 bg-gray-200 rounded-full overflow-hidden">
                 <div 
-                  className="h-full bg-blue-700 rounded-full" 
+                  className="h-full bg-blue-700 rounded-full transition-all duration-300" 
                   style={{ width: `${fetchProgress}%` }}
                 ></div>
               </div>
-              <p className="text-xs text-gray-500 mt-2">This may take a moment due to rate limits</p>
+              <p className="text-xs text-gray-500 mt-2">
+                {fetchProgress < 50 ? 
+                  "Fetching from blockchain..." : 
+                  "Processing transaction data..."}
+              </p>
             </div>
           ) : fetchError ? (
             <div className="text-center py-8">
@@ -385,7 +397,10 @@ const TransactionsPage = () => {
           ) : walletTransactions.length > 0 ? (
             <div className="space-y-4">
               {walletTransactions.map((transaction) => (
-                <div key={transaction.id} className="flex items-center justify-between py-2 border-b border-gray-100">
+                <div 
+                  key={transaction.id} 
+                  className="flex items-center justify-between py-2 border-b border-gray-100 hover:bg-gray-50 rounded px-2"
+                >
                   <div className="flex items-center">
                     {getTypeIcon(transaction.type)}
                     <div className="ml-3">
@@ -444,17 +459,23 @@ const TransactionsPage = () => {
 
         {/* View All Button */}
         <button 
-          onClick={() => {
-            // If needed, you can add navigation to a more detailed view
-            console.log("View all transactions clicked");
-          }}
-          className="w-full bg-blue-700 hover:bg-blue-800 text-white py-3 px-4 rounded-full font-medium flex items-center justify-center"
+          onClick={fetchWalletTransactions}
+          className="w-full bg-blue-700 hover:bg-blue-800 text-white py-3 px-4 rounded-full font-medium flex items-center justify-center mb-6"
           disabled={isLoadingHistory}
         >
-          View All Transactions
-          <svg className="w-5 h-5 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
-          </svg>
+          {isLoadingHistory ? (
+            <>
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+              Loading...
+            </>
+          ) : (
+            <>
+              Refresh Transactions
+              <svg className="w-5 h-5 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </>
+          )}
         </button>
       </div>
     </HalfCircleBackground>

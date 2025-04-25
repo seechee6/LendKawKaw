@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { HalfCircleBackground } from '../components';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
-import { fundLoanOnChain } from '../services/solanaService';
 import { toast } from 'react-hot-toast';
+import { fundLoan } from '../utils/solanaLoanUtils';
+import phantomLogo from "../../images/phantom-logo.png";
 
 const FundingReviewPage = () => {
   const { loanId } = useParams();
@@ -87,23 +88,37 @@ const FundingReviewPage = () => {
       let signature = '';
       
       if (isBlockchainLoan) {
-        // For blockchain loans, use the fundLoanOnChain function
-        toast.loading("Processing blockchain transaction...");
+        // For blockchain loans, use fundLoan from our utilities
+        const loadingToast = toast.loading("Processing blockchain transaction...");
         
-        // Convert the loan amount from string to number
-        const amount = parseFloat(loan.requestedAmount || loan.amount);
+        // Convert the loan amount from RM to SOL (661.62 RM = 1 SOL)
+        const requestedAmount = loan.requestedAmount || loan.amount;
+        const solAmount = parseFloat(requestedAmount) / 661.62;
+        console.log(`Converting ${requestedAmount} RM to ${solAmount.toFixed(4)} SOL for funding`);
         
-        // Call fundLoanOnChain with the loan details
-        signature = await fundLoanOnChain(
+        // Create proper wallet adapter object that matches what getProvider expects
+        const walletAdapter = {
+          publicKey,
+          signTransaction: window.solana?.signTransaction.bind(window.solana),
+          signAllTransactions: window.solana?.signAllTransactions.bind(window.solana),
+          connected
+        };
+        
+        // Call fundLoan with the loan details
+        const result = await fundLoan(
           connection, 
-          {publicKey}, // Use wallet interface compatible with the function
-          loanPublicKey,
-          borrowerPublicKey,
-          amount
+          walletAdapter,
+          loanPublicKey
         );
         
-        toast.dismiss();
-        toast.success("Loan funded successfully on blockchain!");
+        toast.dismiss(loadingToast);
+        
+        if (result.success) {
+          toast.success("Loan funded successfully on blockchain!");
+          signature = result.signature;
+        } else {
+          throw new Error(result.message || "Transaction failed");
+        }
       } else {
         // For mock loans, use the old method or simulate
         toast.loading("Processing transaction...");
@@ -170,13 +185,11 @@ const FundingReviewPage = () => {
   const renderPaymentMethod = () => (
     <div className="flex items-center justify-between">
       <div className="flex items-center">
-        <div className="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center mr-3">
           <img 
-            src="/phantom-icon.png" 
+            src={phantomLogo} 
             alt="Phantom"
-            className="w-6 h-6"
+            className="w-16"
           />
-        </div>
         <div>
           <p className="font-medium">Phantom Wallet</p>
           <p className="text-gray-500 text-sm">{shortenAddress(publicKey)}</p>
@@ -296,6 +309,21 @@ const FundingReviewPage = () => {
               ? "This transaction will be permanently recorded on the Solana blockchain and cannot be reversed."
               : "This transaction cannot be reversed once confirmed."}
           </p>
+        </div>
+
+        {/* Lender Protection Fee Notice */}
+        <div className="mb-6 bg-blue-50 rounded-xl p-4 border border-blue-100">
+          <div className="flex items-start">
+            <svg className="w-5 h-5 text-blue-600 mt-0.5 mr-2 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+            </svg>
+            <div>
+              <h3 className="text-blue-700 font-medium mb-1">Lender Protection Notice</h3>
+              <p className="text-blue-600 text-sm">
+                A 5% protection fee will be automatically deducted from the loan amount before borrowers receive the funds. This fee is held in reserve to protect you in case of default.
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* Fund Now Button */}

@@ -28,14 +28,18 @@ const IDReviewPage = () => {
         setIdCardInfo(parsedInfo);
       } catch (error) {
         console.error('Error parsing ID card info:', error);
-        // If there's an error, go back to the upload page
-        navigate('/onboarding/upload-id');
+        // Instead of redirecting back, just proceed with empty data
+        setIdCardInfo({
+          name: '',
+          identificationNumber: '',
+          address: '',
+          dateOfBirth: '',
+          education: ''
+        });
       }
-    } else {
-      // If no ID info found, go back to the upload page
-      navigate('/onboarding/upload-id');
     }
-  }, [navigate]);
+    // No redirection even if no data is found
+  }, []);
 
   const handleInputChange = (field, value) => {
     setIdCardInfo({
@@ -54,6 +58,11 @@ const IDReviewPage = () => {
   const handleContinue = () => {
     // Save confirmed information to session storage
     sessionStorage.setItem('confirmedIdCardInfo', JSON.stringify(idCardInfo));
+    navigate('/onboarding/selfie');
+  };
+
+  const handleSkip = () => {
+    // Skip this step entirely
     navigate('/onboarding/selfie');
   };
 
@@ -79,7 +88,16 @@ const IDReviewPage = () => {
       </div>
 
       <div className="flex-1 px-6 py-6 overflow-auto">
-        <h1 className="text-2xl font-bold mb-2">Review Your Information</h1>
+        <div className="flex justify-between items-center mb-2">
+          <h1 className="text-2xl font-bold">Review Your Information</h1>
+          <button
+            onClick={handleSkip}
+            className="text-secondary font-medium text-sm py-1 px-3 rounded-md hover:bg-secondary hover:bg-opacity-10"
+          >
+            Skip
+          </button>
+        </div>
+        
         <p className="text-gray-600 mb-6">
           Please confirm the information we extracted from your ID card. This information will be used to verify your identity and process your loan application.
         </p>
@@ -141,36 +159,34 @@ const IDReviewPage = () => {
             )}
           </div>
 
-          {/* Date of Birth (if available) */}
-          {idCardInfo.dateOfBirth && (
-            <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-              <div className="flex justify-between items-center mb-2">
-                <div className="flex items-center">
-                  <HiCalendar className="w-5 h-5 text-secondary mr-2" />
-                  <h2 className="font-medium">Date of Birth</h2>
-                </div>
-                <button 
-                  onClick={() => toggleEditMode('dateOfBirth')}
-                  className="text-secondary hover:text-secondaryLight text-sm flex items-center"
-                >
-                  <HiPencil className="w-4 h-4 mr-1" />
-                  {editMode.dateOfBirth ? 'Done' : 'Edit'}
-                </button>
+          {/* Date of Birth */}
+          <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+            <div className="flex justify-between items-center mb-2">
+              <div className="flex items-center">
+                <HiCalendar className="w-5 h-5 text-secondary mr-2" />
+                <h2 className="font-medium">Date of Birth</h2>
               </div>
-              {editMode.dateOfBirth ? (
-                <input
-                  type="text"
-                  value={idCardInfo.dateOfBirth || ''}
-                  onChange={(e) => handleInputChange('dateOfBirth', e.target.value)}
-                  className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-secondary focus:border-transparent outline-none"
-                  placeholder="DD/MM/YYYY"
-                  autoFocus
-                />
-              ) : (
-                <p className="text-gray-700 px-2 py-3 bg-gray-50 rounded">{idCardInfo.dateOfBirth}</p>
-              )}
+              <button 
+                onClick={() => toggleEditMode('dateOfBirth')}
+                className="text-secondary hover:text-secondaryLight text-sm flex items-center"
+              >
+                <HiPencil className="w-4 h-4 mr-1" />
+                {editMode.dateOfBirth ? 'Done' : 'Edit'}
+              </button>
             </div>
-          )}
+            {editMode.dateOfBirth ? (
+              <input
+                type="text"
+                value={idCardInfo.dateOfBirth || ''}
+                onChange={(e) => handleInputChange('dateOfBirth', e.target.value)}
+                className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-secondary focus:border-transparent outline-none"
+                placeholder="DD/MM/YYYY"
+                autoFocus
+              />
+            ) : (
+              <p className="text-gray-700 px-2 py-3 bg-gray-50 rounded">{idCardInfo.dateOfBirth || 'Not available'}</p>
+            )}
+          </div>
 
           {/* Address */}
           <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
@@ -253,7 +269,7 @@ const IDReviewPage = () => {
           onClick={handleContinue}
           className="w-full bg-secondary text-white font-semibold py-4 rounded-lg hover:bg-secondaryLight transition duration-200"
         >
-          Confirm and Continue
+          Continue
         </button>
       </div>
     </div>

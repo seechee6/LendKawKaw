@@ -366,7 +366,7 @@ const HomePage = () => {
                 <div className="flex justify-between items-center mb-6">
                     <div>
                         <p className="text-white text-opacity-80 text-lg">Welcome,</p>
-                        <h1 className="text-white text-3xl font-bold">{userName || 'User'}</h1>
+                        <h1 className="text-white text-3xl font-bold">Lai Ze Min</h1>
                     </div>
                     <div className="relative">
                         <button onClick={handleNotificationsClick} className="focus:outline-none">

@@ -64,6 +64,11 @@ const UploadIDPage = () => {
     navigate('/onboarding/id-review');
   };
 
+  const handleSkip = () => {
+    // Skip this step entirely
+    navigate('/onboarding/id-review');
+  };
+
   return (
     <div className="flex flex-col min-h-screen bg-white">
       {/* Header */}
@@ -86,7 +91,15 @@ const UploadIDPage = () => {
       </div>
 
       <div className="flex-1 px-6 py-6 overflow-y-auto">
-        <h1 className="text-2xl font-bold mb-2">Upload ID Card Photo</h1>
+        <div className="flex justify-between items-center mb-2">
+          <h1 className="text-2xl font-bold">Upload ID Card Photo</h1>
+          <button
+            onClick={handleSkip}
+            className="text-secondary font-medium text-sm py-1 px-3 rounded-md hover:bg-secondary hover:bg-opacity-10"
+          >
+            Skip
+          </button>
+        </div>
         <p className="text-gray-600 mb-6">Please upload clear photos of your ID card. This step is crucial for verifying your identity and securing your account.</p>
 
         {/* ID Upload Section */}
@@ -217,8 +230,7 @@ const UploadIDPage = () => {
       <div className="px-6 py-4 border-t border-gray-100">
         <button
           onClick={handleContinue}
-          className={`w-full font-semibold py-4 rounded-lg transition duration-200 ${uploadStatus === 'success' ? 'bg-secondary text-white hover:bg-secondaryLight' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}`}
-          disabled={uploadStatus !== 'success'}
+          className="w-full bg-secondary text-white font-semibold py-4 rounded-lg hover:bg-secondaryLight transition duration-200"
         >
           Continue
         </button>

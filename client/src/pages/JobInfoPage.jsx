@@ -51,9 +51,14 @@ const JobInfoPage = () => {
   };
 
   const handleContinue = () => {
-    // Store job information in session storage
+    // Store job information in session storage even if fields are empty
     sessionStorage.setItem('jobInfo', JSON.stringify(formData));
     // Navigate to the next step
+    navigate('/onboarding/upload-id');
+  };
+
+  const handleSkip = () => {
+    // Skip this step entirely without saving any data
     navigate('/onboarding/upload-id');
   };
 
@@ -79,7 +84,15 @@ const JobInfoPage = () => {
       </div>
 
       <div className="flex-1 px-6 py-6">
-        <h1 className="text-2xl font-bold mb-2">Job Information</h1>
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold">Job Information</h1>
+          <button
+            onClick={handleSkip}
+            className="text-secondary font-medium text-sm py-1 px-3 rounded-md hover:bg-secondary hover:bg-opacity-10"
+          >
+            Skip
+          </button>
+        </div>
         <p className="text-gray-600 mb-6">To accurately assess your loan eligibility, please fill out your current employment information. Your privacy is our priority.</p>
 
         <form className="space-y-5">
@@ -128,7 +141,7 @@ const JobInfoPage = () => {
                 onChange={handleInputChange}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg appearance-none focus:ring-2 focus:ring-secondary focus:border-transparent outline-none transition bg-white"
               >
-                <option value="" disabled>Select your employment type</option>
+                <option value="">Select your employment type</option>
                 {employmentTypes.map((type, index) => (
                   <option key={index} value={type}>
                     {type}
@@ -154,7 +167,7 @@ const JobInfoPage = () => {
                 onChange={handleInputChange}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg appearance-none focus:ring-2 focus:ring-secondary focus:border-transparent outline-none transition bg-white"
               >
-                <option value="" disabled>Select your industry</option>
+                <option value="">Select your industry</option>
                 {industries.map((industry, index) => (
                   <option key={index} value={industry}>
                     {industry}
@@ -187,25 +200,15 @@ const JobInfoPage = () => {
               />
             </div>
           </div>
-        </form>
-      </div>
-
-      {/* Bottom buttons */}
-      <div className="px-6 py-4 border-t border-gray-100">
-        <div className="flex gap-4">
-          <button 
-            onClick={() => navigate('/onboarding/upload-id')}
-            className="w-1/3 border border-secondary text-secondary font-semibold py-4 rounded-lg hover:bg-secondary hover:bg-opacity-10 transition duration-200"
-          >
-            Skip
-          </button>
+          
           <button
+            type="button"
             onClick={handleContinue}
-            className="w-2/3 bg-secondary text-white font-semibold py-4 rounded-lg hover:bg-secondaryLight transition duration-200"
+            className="w-full bg-secondary text-white font-semibold py-4 rounded-lg hover:bg-secondaryLight transition duration-200 mt-6"
           >
             Continue
           </button>
-        </div>
+        </form>
       </div>
     </div>
   );

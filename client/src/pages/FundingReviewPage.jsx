@@ -12,6 +12,7 @@ const FundingReviewPage = () => {
   const location = useLocation();
   const { publicKey, connected } = useWallet();
   const { connection } = useConnection();
+  const wallet = useWallet(); // Get the full wallet object with signing methods
   
   const [loan, setLoan] = useState(null);
   const [loadingLoan, setLoadingLoan] = useState(true);
@@ -91,23 +92,11 @@ const FundingReviewPage = () => {
         // For blockchain loans, use fundLoan from our utilities
         const loadingToast = toast.loading("Processing blockchain transaction...");
         
-        // Convert the loan amount from RM to SOL (661.62 RM = 1 SOL)
-        const requestedAmount = loan.requestedAmount || loan.amount;
-        const solAmount = parseFloat(requestedAmount) / 661.62;
-        console.log(`Converting ${requestedAmount} RM to ${solAmount.toFixed(4)} SOL for funding`);
-        
-        // Create proper wallet adapter object that matches what getProvider expects
-        const walletAdapter = {
-          publicKey,
-          signTransaction: window.solana?.signTransaction.bind(window.solana),
-          signAllTransactions: window.solana?.signAllTransactions.bind(window.solana),
-          connected
-        };
-        
-        // Call fundLoan with the loan details
+        // Pass the complete wallet object as provided by useWallet()
+        // No need to create a custom walletAdapter with manually bound methods
         const result = await fundLoan(
           connection, 
-          walletAdapter,
+          wallet, // Use the full wallet object from useWallet()
           loanPublicKey
         );
         
@@ -184,31 +173,33 @@ const FundingReviewPage = () => {
 
   const renderPaymentMethod = () => (
     <div className="flex items-center justify-between">
-      <div className="flex items-center">
+      <div className="flex items-center gap-3">
           <img 
             src={phantomLogo} 
             alt="Phantom"
-            className="w-16"
+            className="w-10 h-10 object-contain"
           />
         <div>
-          <p className="font-medium">Phantom Wallet</p>
+          <p className="font-medium text-gray-800">Phantom Wallet</p>
           <p className="text-gray-500 text-sm">{shortenAddress(publicKey)}</p>
         </div>
       </div>
-      <button className="text-secondary font-medium">Change</button>
+      <button className="text-secondary font-medium hover:text-secondaryLight transition-colors">
+        Change
+      </button>
     </div>
   );
 
   return (
     <HalfCircleBackground title="Funding Review">
-      <div className="max-w-lg mx-auto pt-1 w-full pb-8">
+      <div className="max-w-lg mx-auto pt-1 w-full pb-8 px-4 sm:px-0">
         {/* Blockchain indicator for blockchain loans */}
         {isBlockchainLoan && (
-          <div className="mb-4 bg-blue-100 text-blue-800 px-4 py-2 rounded-lg flex items-center">
-            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <div className="mb-4 bg-blue-100 text-blue-800 px-4 py-3 rounded-lg flex items-center">
+            <svg className="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
-            <span>This transaction will be recorded on the Solana blockchain</span>
+            <span className="text-sm">This transaction will be recorded on the Solana blockchain</span>
           </div>
         )}
       
@@ -219,9 +210,12 @@ const FundingReviewPage = () => {
               <h2 className="text-3xl font-bold text-gray-800">RM {loan.requestedAmount || loan.amount}</h2>
               <div className="flex items-center mt-1">
                 <p className="text-gray-500 text-sm">
-                  {isBlockchainLoan ? 'Blockchain ID:' : 'Loan ID:'} {isBlockchainLoan ? loanPublicKey.substring(0, 8) + '...' : loan.id}
+                  {isBlockchainLoan ? 'Blockchain ID:' : 'Loan ID:'} {isBlockchainLoan ? (loanPublicKey?.substring(0, 8) + '...') : loan.id}
                 </p>
-                <button className="ml-2 text-secondary">
+                <button 
+                  className="ml-2 text-secondary hover:text-secondaryLight transition-colors"
+                  aria-label="Copy loan ID"
+                >
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                   </svg>
@@ -232,7 +226,9 @@ const FundingReviewPage = () => {
             <div className="border-t border-gray-100 pt-4">
               <button 
                 onClick={toggleExpanded}
-                className="flex justify-between items-center w-full text-left mb-3"
+                className="flex justify-between items-center w-full text-left mb-3 hover:bg-gray-50 p-2 rounded-lg transition-colors"
+                aria-expanded={isExpanded}
+                aria-controls="loan-details"
               >
                 <p className="font-medium text-gray-800">{loan.title}</p>
                 <div className="flex items-center">
@@ -250,7 +246,7 @@ const FundingReviewPage = () => {
               </button>
 
               {isExpanded && (
-                <div className="space-y-3 mb-4 bg-gray-50 p-3 rounded-lg">
+                <div id="loan-details" className="space-y-3 mb-4 bg-gray-50 p-4 rounded-lg">
                   <div className="flex justify-between">
                     <p className="text-gray-600">Payment Term</p>
                     <p className="font-medium">{loan.term}</p>
@@ -288,7 +284,7 @@ const FundingReviewPage = () => {
         {/* Payment Method Section */}
         <div className="mb-6">
           <h3 className="text-gray-700 font-medium mb-3">Selected Payment Method</h3>
-          <div className="bg-white rounded-xl shadow-sm p-4">
+          <div className="bg-white rounded-xl shadow-sm p-4 hover:shadow-md transition-shadow">
             {renderPaymentMethod()}
           </div>
         </div>
@@ -299,10 +295,19 @@ const FundingReviewPage = () => {
           <p className="text-yellow-700 text-sm mb-2">
             By funding this loan, you agree to:
           </p>
-          <ul className="text-yellow-700 text-sm space-y-1 mb-2">
-            <li>• Transfer RM {loan.requestedAmount || loan.amount} to the borrower</li>
-            <li>• Accept the proposed interest rate of {loan.proposedInterest}</li>
-            <li>• Receive monthly payments of RM {loan.monthlyPayment || Math.round(parseFloat(loan.amount || 0) / parseInt(loan.duration || 1))} for {loan.term}</li>
+          <ul className="text-yellow-700 text-sm space-y-2 mb-3 pl-1">
+            <li className="flex items-start">
+              <span className="mr-1">•</span>
+              <span>Transfer RM {loan.requestedAmount || loan.amount} to the borrower</span>
+            </li>
+            <li className="flex items-start">
+              <span className="mr-1">•</span>
+              <span>Accept the proposed interest rate of {loan.proposedInterest}</span>
+            </li>
+            <li className="flex items-start">
+              <span className="mr-1">•</span>
+              <span>Receive monthly payments of RM {loan.monthlyPayment || Math.round(parseFloat(loan.amount || 0) / parseInt(loan.duration || 1))} for {loan.term}</span>
+            </li>
           </ul>
           <p className="text-yellow-700 text-sm">
             {isBlockchainLoan 
@@ -355,7 +360,8 @@ const FundingReviewPage = () => {
         {/* Back Button */}
         <button 
           onClick={() => navigate(-1)}
-          className="flex items-center text-blue-700 font-medium mt-5"
+          className="flex items-center text-blue-700 font-medium mt-5 hover:text-blue-900 transition-colors"
+          aria-label="Back to loan details"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />

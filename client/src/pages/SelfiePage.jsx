@@ -66,7 +66,7 @@ const SelfiePage = () => {
         setLivenessStatus('verified');
         captureImage();
       }
-    }, 3000);
+    }, 1500);
     
     return () => clearInterval(promptInterval);
   };
@@ -105,8 +105,12 @@ const SelfiePage = () => {
   };
 
   const handleContinue = () => {
-    // In a real app, you would validate that liveness detection was successful
-    // Send the captured image to backend for further processing
+    // No need to validate, just continue
+    navigate('/onboarding/upload-payslip');
+  };
+
+  const handleSkip = () => {
+    // Skip this step entirely
     navigate('/onboarding/upload-payslip');
   };
 
@@ -132,7 +136,15 @@ const SelfiePage = () => {
       </div>
 
       <div className="flex-1 px-6 py-6">
-        <h1 className="text-2xl font-bold mb-2">Face Verification</h1>
+        <div className="flex justify-between items-center mb-2">
+          <h1 className="text-2xl font-bold">Face Verification</h1>
+          <button
+            onClick={handleSkip}
+            className="text-secondary font-medium text-sm py-1 px-3 rounded-md hover:bg-secondary hover:bg-opacity-10"
+          >
+            Skip
+          </button>
+        </div>
         <p className="text-gray-600 mb-6">Complete a quick liveness check to verify your identity. Follow the on-screen instructions.</p>
 
         {/* Liveness Detection Section */}
@@ -234,10 +246,9 @@ const SelfiePage = () => {
       <div className="px-6 py-4 border-t border-gray-100">
         <button
           onClick={handleContinue}
-          className={`w-full font-semibold py-4 rounded-lg transition duration-200 ${capturedImage ? 'bg-secondary text-white hover:bg-secondaryLight' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}`}
-          disabled={!capturedImage}
+          className="w-full bg-secondary text-white font-semibold py-4 rounded-lg hover:bg-secondaryLight transition duration-200"
         >
-          {livenessStatus === 'checking' ? 'Verifying...' : 'Continue'}
+          Continue
         </button>
       </div>
     </div>

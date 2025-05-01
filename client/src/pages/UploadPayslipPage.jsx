@@ -33,8 +33,13 @@ const UploadPayslipPage = () => {
   };
 
   const handleContinue = () => {
-    // In a real app, you would validate that files were uploaded successfully
-    navigate('/onboarding/success'); // Navigate to the success page
+    // No validation, just proceed to success page
+    navigate('/onboarding/success');
+  };
+
+  const handleSkip = () => {
+    // Skip this step entirely
+    navigate('/onboarding/success');
   };
 
   const formatFileSize = (bytes) => {
@@ -65,7 +70,15 @@ const UploadPayslipPage = () => {
       </div>
 
       <div className="flex-1 px-6 py-6">
-        <h1 className="text-2xl font-bold mb-2">Upload Documents</h1>
+        <div className="flex justify-between items-center mb-2">
+          <h1 className="text-2xl font-bold">Upload Documents</h1>
+          <button
+            onClick={handleSkip}
+            className="text-secondary font-medium text-sm py-1 px-3 rounded-md hover:bg-secondary hover:bg-opacity-10"
+          >
+            Skip
+          </button>
+        </div>
         <p className="text-gray-600 mb-6">Please upload your financial documents or educational certificates to help us assess your loan eligibility. If you don't have a payslip, you can upload bank statements, receipts or education certifications.</p>
 
         {/* Document Type Selector */}
@@ -230,21 +243,12 @@ const UploadPayslipPage = () => {
 
       {/* Bottom button */}
       <div className="px-6 py-4 border-t border-gray-100">
-        <div className="flex gap-4">
-          <button 
-            onClick={() => navigate('/onboarding/success')}
-            className="w-1/3 border border-secondary text-secondary font-semibold py-4 rounded-lg hover:bg-secondary hover:bg-opacity-10 transition duration-200"
-          >
-            Skip
-          </button>
-          <button
-            onClick={handleContinue}
-            className={`w-2/3 font-semibold py-4 rounded-lg transition duration-200 ${uploadedFiles.length > 0 ? 'bg-secondary text-white hover:bg-secondaryLight' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}`}
-            disabled={uploadedFiles.length === 0}
-          >
-            Continue
-          </button>
-        </div>
+        <button
+          onClick={handleContinue}
+          className="w-full bg-secondary text-white font-semibold py-4 rounded-lg hover:bg-secondaryLight transition duration-200"
+        >
+          Continue
+        </button>
       </div>
     </div>
   );

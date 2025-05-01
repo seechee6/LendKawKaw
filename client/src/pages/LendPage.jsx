@@ -7,7 +7,12 @@ import { HiOutlineEye, HiOutlineUser, HiOutlineCash, HiOutlineCalendar, HiOutlin
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { toast } from 'react-hot-toast';
-import { fetchAvailableLoans } from '../utils/solanaLoanUtils';
+import { Program, AnchorProvider } from '@project-serum/anchor';
+import { PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
+import idl from '../idl/idl.json';
+
+// Use program ID from environment variable
+const programID = new PublicKey(import.meta.env.VITE_PROGRAM_ID || "DAyqZYocAeQd8ApqkoyYQuLG8dcYv3JDwehxbaxmwZ1n");
 
 const LendPage = () => {
   const { publicKey } = useWallet();
@@ -42,8 +47,44 @@ const LendPage = () => {
       // Only fetch blockchain loans if connection is available
       if (connection) {
         try {
-          const blockchainLoans = await fetchAvailableLoans(connection);
-          console.log("Blockchain loans:", blockchainLoans);
+          console.log('Fetching available loans from blockchain...');
+          
+          // Create provider without wallet (read-only)
+          const provider = new AnchorProvider(
+            connection, 
+            {
+              publicKey: PublicKey.default,
+              signTransaction: () => Promise.reject(new Error("Read-only")),
+              signAllTransactions: () => Promise.reject(new Error("Read-only")),
+            },
+            { preflightCommitment: 'confirmed' }
+          );
+          
+          const program = new Program(idl, programID, provider);
+          
+          // Fetch all loan accounts
+          const allLoanAccounts = await program.account.loan.all();
+          console.log('All loan accounts found:', allLoanAccounts.length);
+          
+          // Filter for available loans (not active and not completed)
+          const blockchainLoans = allLoanAccounts
+            .filter(account => !account.account.isActive && !account.account.isCompleted)
+            .map(account => {
+              const data = account.account;
+              return {
+                id: data.id.toString(),
+                publicKey: account.publicKey.toString(),
+                borrower: data.borrower.toString(),
+                amount: data.amount.toString() / LAMPORTS_PER_SOL,
+                interestRate: data.interestRate / 100, // Convert basis points to percentage
+                duration: data.duration.toString() / (30 * 24 * 60 * 60), // Convert seconds to months
+                isActive: data.isActive,
+                isCompleted: data.isCompleted,
+                description: data.description || 'Loan Application'
+              };
+            });
+          
+          console.log("Available blockchain loans:", blockchainLoans);
           
           // Transform blockchain loan data to match our UI format
           const loans = blockchainLoans.map(loan => ({
@@ -51,7 +92,7 @@ const LendPage = () => {
             publicKey: loan.publicKey, // We'll need this to fund the loan
             title: loan.description || 'Loan Application',
             borrower: loan.borrower,
-            requestDate: new Date().toLocaleDateString(), // Blockchain doesn't have this info
+            requestDate: new Date().toLocaleDateString(),
             requestedAmount: parseFloat(loan.amount) * 661.62, // Convert SOL to RM (1 SOL = 661.62 RM)
             solAmount: parseFloat(loan.amount), // Keep the original SOL amount
             monthlyPayment: (parseFloat(loan.amount) * 661.62 / parseInt(loan.duration)).toFixed(2), // Calculate in RM
@@ -61,6 +102,7 @@ const LendPage = () => {
             risk: calculateRiskLevel(loan.interestRate),
             creditScore: '---', // Not available from blockchain
             status: 'pending',
+            isBlockchainLoan: true, // Flag to indicate this is a blockchain loan
             // Simulated premium insights
             riskScore: calculateRiskScore(loan.interestRate),
             onTimePayment: 95,
@@ -109,6 +151,7 @@ const LendPage = () => {
       navigate(`/fund/${loan.id}`, { 
         state: { 
           loan,
+          isBlockchainLoan: true,
           loanPublicKey: loan.publicKey,
           borrowerPublicKey: loan.borrower
         }

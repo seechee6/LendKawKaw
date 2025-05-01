@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { HalfCircleBackground } from '../components';
-import { useConnection, useWallet } from '@solana/wallet-adapter-react';
+import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
-import { fetchLoanFromChain } from '../services/solanaService';
 import { toast } from 'react-hot-toast';
+import { PublicKey } from '@solana/web3.js';
+import { fetchLoanFromChain } from '../services/solanaService';
 
 const LoanFundingPage = () => {
   const { loanId } = useParams();
@@ -29,6 +30,11 @@ const LoanFundingPage = () => {
           
           // Check if this is a blockchain loan
           if (location.state.isBlockchainLoan) {
+            console.log('Blockchain loan detected with data:', {
+              loanPublicKey: location.state.loanPublicKey,
+              borrowerPublicKey: location.state.borrowerPublicKey
+            });
+            
             setIsBlockchainLoan(true);
             setLoanPublicKey(location.state.loanPublicKey);
             setBorrowerPublicKey(location.state.borrowerPublicKey);
@@ -92,6 +98,12 @@ const LoanFundingPage = () => {
       toast.error("Please connect your wallet first");
       return;
     }
+    
+    console.log('Handling fund with data:', {
+      isBlockchainLoan,
+      loanPublicKey,
+      borrowerPublicKey
+    });
     
     // Pass blockchain information if this is a blockchain loan
     if (isBlockchainLoan) {

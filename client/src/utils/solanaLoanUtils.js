@@ -188,26 +188,65 @@ export const fundLoan = async (connection, wallet, loanPublicKey) => {
     return { success: false, message: 'Wallet not connected' };
   }
 
+  console.log('Starting fundLoan function with:', {
+    wallet: wallet ? 'Connected' : 'Not connected',
+    walletConnected: wallet.connected,
+    walletPublicKey: wallet.publicKey?.toString(),
+    loanPublicKey: loanPublicKey instanceof PublicKey 
+      ? loanPublicKey.toString() 
+      : typeof loanPublicKey === 'string' ? loanPublicKey : 'Invalid',
+  });
+
   const loadingToast = toast.loading('Funding loan...');
 
   try {
+    // Ensure loanPublicKey is a PublicKey instance
+    const loanPubKey = loanPublicKey instanceof PublicKey
+      ? loanPublicKey
+      : new PublicKey(loanPublicKey);
+    
+    console.log('Getting program instance...');
     const program = getProgram(connection, wallet);
     
+    if (!program) {
+      throw new Error('Failed to get program instance');
+    }
+    
+    console.log('Fetching loan account...');
     // Fetch the loan account to get borrower and amount
-    const loanAccount = await program.account.loan.fetch(new PublicKey(loanPublicKey));
+    const loanAccount = await program.account.loan.fetch(loanPubKey);
+    console.log('Loan account fetched:', {
+      borrower: loanAccount.borrower.toString(),
+      amount: loanAccount.amount.toString(),
+      isActive: loanAccount.isActive,
+    });
+    
+    if (loanAccount.isActive) {
+      throw new Error('This loan has already been funded');
+    }
+    
     const borrowerPubkey = loanAccount.borrower;
     const amount = loanAccount.amount;
+    
+    console.log('Building transaction...');
+    console.log('Transaction accounts:', {
+      lender: wallet.publicKey.toString(),
+      borrower: borrowerPubkey.toString(),
+      loan: loanPubKey.toString(),
+    });
     
     const tx = await program.methods
       .fundLoan(amount)
       .accounts({
         lender: wallet.publicKey,
         borrower: borrowerPubkey,
-        loan: new PublicKey(loanPublicKey),
+        loan: loanPubKey,
         systemProgram: web3.SystemProgram.programId,
         clock: web3.SYSVAR_CLOCK_PUBKEY
       })
       .rpc();
+    
+    console.log('Transaction sent:', tx);
     
     toast.dismiss(loadingToast);
     toast.success('Loan funded successfully!');
@@ -218,13 +257,25 @@ export const fundLoan = async (connection, wallet, loanPublicKey) => {
       signature: tx
     };
   } catch (error) {
+    console.error('Error details:', error);
+    
+    let errorMessage = 'Unknown error';
+    
+    // Try to extract a more specific error message
+    if (error.message) {
+      errorMessage = error.message;
+    } else if (error.logs) {
+      // Logs often contain useful error information
+      errorMessage = error.logs.join('\n');
+    }
+    
     toast.dismiss(loadingToast);
     console.error('Error funding loan:', error);
     
-    toast.error(`Funding failed: ${error.message || 'Unknown error'}`);
+    toast.error(`Funding failed: ${errorMessage}`);
     return {
       success: false,
-      message: `Error: ${error.message || 'Unknown error'}`,
+      message: `Error: ${errorMessage}`,
       error
     };
   }

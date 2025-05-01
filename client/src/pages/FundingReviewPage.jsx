@@ -5,6 +5,11 @@ import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { toast } from 'react-hot-toast';
 import { fundLoan } from '../utils/solanaLoanUtils';
 import phantomLogo from "../../images/phantom-logo.png";
+import { PublicKey } from '@solana/web3.js';
+import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
+
+// Import adapter styles for proper wallet button styling
+import '@solana/wallet-adapter-react-ui/styles.css';
 
 const FundingReviewPage = () => {
   const { loanId } = useParams();
@@ -37,6 +42,12 @@ const FundingReviewPage = () => {
             setIsBlockchainLoan(true);
             setLoanPublicKey(location.state.loanPublicKey);
             setBorrowerPublicKey(location.state.borrowerPublicKey);
+            
+            console.log('Blockchain loan details loaded:', {
+              loanPublicKey: location.state.loanPublicKey,
+              borrowerPublicKey: location.state.borrowerPublicKey,
+              loan: location.state.loan
+            });
           }
           
           setLoadingLoan(false);
@@ -76,9 +87,31 @@ const FundingReviewPage = () => {
     fetchLoanDetails();
   }, [loanId, location]);
 
+  useEffect(() => {
+    // Check wallet connection status on component mount and whenever it changes
+    if (connected && publicKey) {
+      console.log('Wallet connected in component:', publicKey.toString());
+    } else {
+      console.log('Wallet not connected in component');
+    }
+  }, [connected, publicKey]);
+
   const handleFundNow = async () => {
     if (!connected) {
       toast.error("Please connect your wallet first");
+      // Show wallet modal if not connected
+      document.querySelector('.wallet-adapter-button')?.click();
+      return;
+    }
+    
+    console.log('Starting funding process...');
+    console.log('Wallet connected:', connected);
+    console.log('Wallet public key:', publicKey?.toString());
+    console.log('Blockchain loan:', isBlockchainLoan);
+    console.log('Loan Public Key:', loanPublicKey);
+    
+    if (isBlockchainLoan && !loanPublicKey) {
+      toast.error("Missing loan information. Please try again from the loan listing page.");
       return;
     }
     
@@ -92,12 +125,32 @@ const FundingReviewPage = () => {
         // For blockchain loans, use fundLoan from our utilities
         const loadingToast = toast.loading("Processing blockchain transaction...");
         
+        console.log('Funding blockchain loan with:', {
+          connection: connection ? 'Connected' : 'Not connected',
+          wallet: wallet ? 'Connected' : 'Not connected',
+          walletPublicKey: wallet.publicKey?.toString(),
+          loanPublicKey: loanPublicKey,
+        });
+        
+        if (!loanPublicKey) {
+          throw new Error("Loan public key is missing");
+        }
+        
+        // Ensure loanPublicKey is a PublicKey object
+        const loanPubKey = typeof loanPublicKey === 'string' 
+          ? new PublicKey(loanPublicKey)
+          : loanPublicKey;
+          
+        // Verify that loanPubKey is now a valid public key
+        if (!(loanPubKey instanceof PublicKey)) {
+          throw new Error("Invalid loan public key format");
+        }
+        
         // Pass the complete wallet object as provided by useWallet()
-        // No need to create a custom walletAdapter with manually bound methods
         const result = await fundLoan(
           connection, 
           wallet, // Use the full wallet object from useWallet()
-          loanPublicKey
+          loanPubKey
         );
         
         toast.dismiss(loadingToast);
@@ -142,7 +195,7 @@ const FundingReviewPage = () => {
     } catch (error) {
       console.error("Error funding loan:", error);
       toast.dismiss();
-      toast.error("Transaction failed. Please try again.");
+      toast.error(`Transaction failed: ${error.message}`);
       setTransactionError(
         error.message || "Transaction failed. Please try again."
       );
@@ -199,15 +252,29 @@ const FundingReviewPage = () => {
             <svg className="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
-            <span className="text-sm">This transaction will be recorded on the Solana blockchain</span>
+            <span className="text-sm">
+              This transaction will be recorded on the Solana blockchain
+            </span>
           </div>
         )}
       
+        {/* Wallet connection reminder */}
+        {!connected && (
+          <div className="mb-6 p-4 bg-yellow-50 rounded-lg border border-yellow-100">
+            <p className="text-yellow-800 mb-3">Connect your wallet to fund this loan</p>
+            <WalletMultiButton className="w-full flex justify-center" />
+          </div>
+        )}
+        
         {/* Loan Amount Card */}
         <div className="bg-white rounded-xl shadow-md overflow-hidden mb-6">
           <div className="p-6">
             <div className="mb-5">
-              <h2 className="text-3xl font-bold text-gray-800">RM {loan.requestedAmount || loan.amount}</h2>
+              <h2 className="text-3xl font-bold text-gray-800">
+                {isBlockchainLoan 
+                  ? `${loan.solAmount} SOL` 
+                  : `RM ${loan.requestedAmount || loan.amount}`}
+              </h2>
               <div className="flex items-center mt-1">
                 <p className="text-gray-500 text-sm">
                   {isBlockchainLoan ? 'Blockchain ID:' : 'Loan ID:'} {isBlockchainLoan ? (loanPublicKey?.substring(0, 8) + '...') : loan.id}
@@ -254,7 +321,9 @@ const FundingReviewPage = () => {
                   <div className="flex justify-between">
                     <p className="text-gray-600">Monthly Payment</p>
                     <p className="font-medium">
-                      RM {loan.monthlyPayment || Math.round(parseFloat(loan.amount || 0) / parseInt(loan.duration || 1))}
+                      {isBlockchainLoan
+                        ? `${(loan.solAmount / parseInt(loan.duration)).toFixed(4)} SOL`
+                        : `RM ${loan.monthlyPayment || Math.round(parseFloat(loan.amount || 0) / parseInt(loan.duration || 1))}`}
                     </p>
                   </div>
                   <div className="flex justify-between">
@@ -298,7 +367,9 @@ const FundingReviewPage = () => {
           <ul className="text-yellow-700 text-sm space-y-2 mb-3 pl-1">
             <li className="flex items-start">
               <span className="mr-1">•</span>
-              <span>Transfer RM {loan.requestedAmount || loan.amount} to the borrower</span>
+              <span>Transfer {isBlockchainLoan 
+                ? `${loan.solAmount} SOL` 
+                : `RM ${loan.requestedAmount || loan.amount}`} to the borrower</span>
             </li>
             <li className="flex items-start">
               <span className="mr-1">•</span>
@@ -306,7 +377,9 @@ const FundingReviewPage = () => {
             </li>
             <li className="flex items-start">
               <span className="mr-1">•</span>
-              <span>Receive monthly payments of RM {loan.monthlyPayment || Math.round(parseFloat(loan.amount || 0) / parseInt(loan.duration || 1))} for {loan.term}</span>
+              <span>Receive monthly payments of {isBlockchainLoan
+                ? `${(loan.solAmount / parseInt(loan.duration)).toFixed(4)} SOL`
+                : `RM ${loan.monthlyPayment || Math.round(parseFloat(loan.amount || 0) / parseInt(loan.duration || 1))}`} for {loan.term}</span>
             </li>
           </ul>
           <p className="text-yellow-700 text-sm">
@@ -347,7 +420,9 @@ const FundingReviewPage = () => {
                 : "bg-gray-300 text-gray-500 cursor-not-allowed"
             }`}
           >
-            {connected ? `Fund Now - RM ${loan.requestedAmount || loan.amount}` : "Connect Wallet to Fund"}
+            {connected ? `Fund Now - ${isBlockchainLoan 
+              ? `${loan.solAmount} SOL` 
+              : `RM ${loan.requestedAmount || loan.amount}`}` : "Connect Wallet to Fund"}
           </button>
         )}
         
